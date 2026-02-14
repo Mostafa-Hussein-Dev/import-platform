@@ -1,0 +1,36 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npx prisma generate:*)",
+      "Bash(npx prisma migrate:*)",
+      "Bash(npx shadcn@latest add:*)",
+      "Bash(pnpm add:*)",
+      "Bash(pnpm run build)",
+      "Bash(timeout 30s pnpm run dev:*)",
+      "Bash(pnpm run dev:*)",
+      "Bash(test:*)",
+      "Bash(pnpm remove:*)",
+      "Bash(pnpm prisma migrate:*)",
+      "Bash(pnpm prisma generate:*)",
+      "Bash(pnpm list:*)",
+      "Bash(taskkill:*)",
+      "Bash(npm run build:*)",
+      "Bash(pnpm approve-builds:*)",
+      "Bash(pnpm install:*)",
+      "Bash(npx prisma db push:*)",
+      "Bash(powershell:*)",
+      "Bash(printf:*)",
+      "Bash(\"C:\\\\Mostafa Files\\\\Computer Engineering\\\\import-platform\\\\app\\\\\\(dashboard\\)\\\\dashboard\\\\potential-products\\\\[id]\\\\edit\\\\page.tsx\")",
+      "Bash(cat:*)",
+      "Bash(npx tsserver:*)",
+      "Bash(tasklist:*)",
+      "Bash(node:*)",
+      "Bash(kill:*)",
+      "Bash(grep:*)",
+      "Bash(xxd -l -1)",
+      "Bash(head:*)",
+      "Bash(find:*)",
+      "Bash(npx next build:*)"
+    ]
+  }
+}

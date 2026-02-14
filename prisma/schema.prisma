@@ -1,14 +1,312 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
-// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
-
 generator client {
-  provider = "prisma-client"
-  output   = "../lib/generated/prisma"
+  provider = "prisma-client-js"
 }
 
 datasource db {
   provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String    @unique
+  emailVerified DateTime?
+  password      String    // hashed password
+  image         String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  accounts      Account[]
+  sessions      Session[]
+  suppliers     Supplier[]
+
+  @@map("users")
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@map("accounts")
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("sessions")
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+  @@map("verification_tokens")
+}
+
+model Supplier {
+  id             String   @id @default(cuid())
+  userId         String
+  companyName    String
+  contactPerson  String?
+  country        String   @default("China")
+  email          String?
+  phone          String?
+  whatsapp       String?
+  wechat         String?
+  address        String?
+  website        String?
+  paymentTerms   String?
+  leadTime       String?
+  rating         Decimal?  @db.Decimal(3, 2)
+  notes          String?
+  isActive       Boolean  @default(true)
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  user              User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  products          Product[]
+  potentialProducts PotentialProduct[]
+  purchaseOrders    PurchaseOrder[]
+
+  @@index([isActive])
+  @@index([userId])
+  @@map("suppliers")
+}
+
+model Product {
+  id             String    @id @default(cuid())
+  sku            String    @unique
+  name           String
+  description    String?
+  supplierId     String
+  supplierSku    String?
+  costPrice      Decimal   @db.Decimal(10, 2)
+  wholesalePrice Decimal   @db.Decimal(10, 2)
+  retailPrice    Decimal   @db.Decimal(10, 2)
+  currentStock   Int       @default(0)
+  reorderLevel   Int       @default(10)
+  moq            Int?
+  landedCost     Decimal?  @db.Decimal(10, 2)
+  category       String?
+  brand          String?
+  weightKg       Decimal?  @db.Decimal(10, 2)
+  lengthCm       Decimal?  @db.Decimal(10, 2)
+  widthCm        Decimal?  @db.Decimal(10, 2)
+  heightCm       Decimal?  @db.Decimal(10, 2)
+  images         String[]
+  warehouseLocation String?
+  status         ProductStatus @default(ACTIVE)
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
+
+  supplier         Supplier          @relation(fields: [supplierId], references: [id], onDelete: Restrict)
+  potentialProduct PotentialProduct?
+  purchaseOrderItems PurchaseOrderItem[]
+
+  @@index([supplierId])
+  @@index([status])
+  @@map("products")
+}
+
+enum ProductStatus {
+  ACTIVE
+  DISCONTINUED
+}
+
+enum PotentialProductStatus {
+  RESEARCHING
+  APPROVED
+  REJECTED
+  CONVERTED
+}
+
+model PotentialProduct {
+  id              String                  @id @default(cuid())
+  name            String
+  description     String?                 @db.Text
+
+  // Supplier (optional - might not have supplier yet during research)
+  supplierId      String?
+  supplier        Supplier?               @relation(fields: [supplierId], references: [id], onDelete: SetNull)
+  supplierSku     String?
+
+  // Estimated pricing (research phase estimates)
+  estimatedCost   Decimal?                @db.Decimal(10, 2)
+  estimatedPrice  Decimal?                @db.Decimal(10, 2)
+  moq             Int?                    // Minimum order quantity
+
+  // Product details (for research/planning)
+  category        String?
+  brand           String?
+  weightKg        Decimal?                @db.Decimal(10, 2)
+  lengthCm        Decimal?                @db.Decimal(10, 2)
+  widthCm         Decimal?                @db.Decimal(10, 2)
+  heightCm        Decimal?                @db.Decimal(10, 2)
+
+  // Research data
+  sourceUrl       String?                 // Link to Alibaba/1688 listing
+  images          String[]                // Array of image URLs
+  notes           String?                 @db.Text
+
+  // Status workflow
+  status          PotentialProductStatus  @default(RESEARCHING)
+
+  // If converted to actual product
+  productId       String?                 @unique
+  product         Product?                @relation(fields: [productId], references: [id], onDelete: SetNull)
+
+  // Metadata
+  createdBy       String?                 // User ID from NextAuth
+  createdAt       DateTime                @default(now())
+  updatedAt       DateTime                @updatedAt
+
+  @@index([supplierId])
+  @@index([status])
+  @@index([createdAt])
+  @@map("potential_products")
+}
+
+// Phase 3: Purchasing & Shipping
+
+model ShippingCompany {
+  id              String    @id @default(cuid())
+  name            String
+  type            String    // "sea", "air", "courier"
+  contactPerson   String?
+  email           String?
+  phone           String?
+
+  // Rates
+  ratePerKg       Decimal?  @db.Decimal(10, 2)
+  ratePerCBM      Decimal?  @db.Decimal(10, 2)  // For sea freight (cubic meter)
+  minCharge       Decimal?  @db.Decimal(10, 2)
+
+  transitTime     String?   // "25-30 days"
+  notes           String?   @db.Text
+  isActive        Boolean   @default(true)
+
+  shipments       Shipment[]
+
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@index([isActive])
+  @@map("shipping_companies")
+}
+
+model PurchaseOrder {
+  id              String    @id @default(cuid())
+  poNumber        String    @unique  // PO-2025-001 (auto-generated)
+
+  supplierId      String
+  supplier        Supplier  @relation(fields: [supplierId], references: [id])
+
+  orderDate       DateTime  @default(now())
+  expectedDate    DateTime? // Expected delivery date
+
+  status          String    @default("draft") // draft, sent, confirmed, producing, shipped, received
+
+  // Costs
+  subtotal        Decimal   @db.Decimal(10, 2)
+  shippingEstimate Decimal?  @db.Decimal(10, 2)
+  totalCost       Decimal   @db.Decimal(10, 2)
+
+  // Payment tracking
+  paymentStatus   String    @default("pending") // pending, partial, paid
+  paidAmount      Decimal   @db.Decimal(10, 2) @default(0)
+
+  notes           String?   @db.Text
+
+  items           PurchaseOrderItem[]
+  shipment        Shipment?
+
+  createdBy       String?   // User ID from NextAuth
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@index([supplierId])
+  @@index([status])
+  @@index([orderDate])
+  @@map("purchase_orders")
+}
+
+model PurchaseOrderItem {
+  id              String        @id @default(cuid())
+  purchaseOrderId String
+  purchaseOrder   PurchaseOrder @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
+
+  productId       String
+  product         Product       @relation(fields: [productId], references: [id])
+
+  quantity        Int
+  unitCost        Decimal       @db.Decimal(10, 2)
+  totalCost       Decimal       @db.Decimal(10, 2)
+
+  receivedQty     Int           @default(0)  // Track partial deliveries
+
+  @@index([purchaseOrderId])
+  @@index([productId])
+  @@map("purchase_order_items")
+}
+
+model Shipment {
+  id                String          @id @default(cuid())
+  shipmentNumber    String          @unique  // SHIP-2025-001 (auto-generated)
+
+  purchaseOrderId   String          @unique
+  purchaseOrder     PurchaseOrder   @relation(fields: [purchaseOrderId], references: [id])
+
+  shippingCompanyId String
+  shippingCompany   ShippingCompany @relation(fields: [shippingCompanyId], references: [id])
+
+  method            String          // "sea", "air", "courier"
+
+  // Dates
+  departureDate     DateTime?
+  estimatedArrival  DateTime?
+  actualArrival     DateTime?
+
+  trackingNumber    String?
+
+  status            String          @default("pending") // pending, in_transit, customs, delivered
+
+  // Weight and volume
+  totalWeight       Decimal?        @db.Decimal(10, 2)  // kg
+  totalVolume       Decimal?        @db.Decimal(10, 2)  // CBM (cubic meters)
+
+  // Costs
+  shippingCost      Decimal         @db.Decimal(10, 2)
+  customsDuty       Decimal?        @db.Decimal(10, 2)
+  otherFees         Decimal?        @db.Decimal(10, 2)
+  totalCost         Decimal         @db.Decimal(10, 2)  // sum of all costs
+
+  notes             String?         @db.Text
+
+  createdBy         String?         // User ID from NextAuth
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+
+  @@index([status])
+  @@index([purchaseOrderId])
+  @@map("shipments")
 }
