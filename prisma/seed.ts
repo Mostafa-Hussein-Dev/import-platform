@@ -1,8 +1,7 @@
-import { PrismaClient } from "@prisma/client";
+import { prisma } from "../lib/prisma";
 import { addDays, addWeeks, subDays, subMonths } from "date-fns";
 import bcrypt from "bcryptjs";
 
-const prisma = new PrismaClient();
 
 // Helper to convert decimal to Prisma Decimal
 function toDecimal(value: number): number {
