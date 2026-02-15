@@ -101,7 +101,7 @@ export default function PurchaseOrderViewPage({
     setPaymentSubmitting(true);
     const result = await recordPayment(id, {
       amount: parseFloat(paymentAmount),
-      date: new Date(paymentDate),
+      date: paymentDate,
       notes: paymentNotes || undefined,
     });
     setPaymentSubmitting(false);
@@ -263,7 +263,7 @@ export default function PurchaseOrderViewPage({
               <p className="text-sm text-muted-foreground">Supplier</p>
               <Link
                 href={`/dashboard/suppliers/${po.supplier.id}`}
-                className="font-medium text-blue-600 hover:underline"
+                className="font-medium text-[#3A9FE1] hover:underline"
               >
                 {po.supplier.companyName}
               </Link>
@@ -423,7 +423,7 @@ export default function PurchaseOrderViewPage({
             <CardContent>
               <Link
                 href={`/dashboard/shipments/${po.shipment.id}`}
-                className="font-medium text-blue-600 hover:underline"
+                className="font-medium text-[#3A9FE1] hover:underline"
               >
                 {po.shipment.shipmentNumber}
               </Link>

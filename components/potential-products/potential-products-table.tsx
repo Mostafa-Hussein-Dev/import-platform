@@ -99,7 +99,7 @@ export function PotentialProductsTable({
         return (
           <Link
             href={`/dashboard/potential-products/${id}`}
-            className="font-medium text-[#212861] hover:text-blue-600 hover:underline"
+            className="font-medium text-[#212861] hover:text-[#3A9FE1] hover:underline"
           >
             {name}
           </Link>

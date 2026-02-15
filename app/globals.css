@@ -7,8 +7,8 @@
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --font-sans: var(--font-inter), system-ui, -apple-system, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, monospace;
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -56,9 +56,9 @@
 }
 
 :root {
-  --radius: 0.75rem;
-  /* BCFI Light Theme - Financial Dashboard */
-  --background: #F0F7FC;
+  --radius: 0.5rem;
+  /* BCFI Light Theme */
+  --background: #F3F5F9;
   --foreground: #212861;
   --card: #FFFFFF;
   --card-foreground: #212861;
@@ -81,14 +81,13 @@
   --chart-3: #8B5CF6;
   --chart-4: #10B981;
   --chart-5: #F59E0B;
-  /* Sidebar - White with blue accents */
   --sidebar: #FFFFFF;
   --sidebar-foreground: #212861;
   --sidebar-primary: #3A9FE1;
   --sidebar-primary-foreground: #FFFFFF;
   --sidebar-accent: #E8F4FB;
   --sidebar-accent-foreground: #3A9FE1;
-  --sidebar-border: #E5E7EB;
+  --sidebar-border: #F3F4F6;
   --sidebar-ring: #3A9FE1;
 }
 
@@ -133,15 +132,33 @@
   body {
     @apply bg-background text-foreground;
   }
+
+  /* Typography scale */
+  h1 {
+    @apply text-[2rem] leading-tight font-bold tracking-tight;
+    color: #212861;
+  }
+  h2 {
+    @apply text-2xl leading-snug font-semibold tracking-tight;
+    color: #212861;
+  }
+  h3 {
+    @apply text-xl leading-snug font-semibold;
+    color: #212861;
+  }
+  h4 {
+    @apply text-lg leading-snug font-semibold;
+    color: #212861;
+  }
 }
 
-/* BCFI gradient background */
+/* ===== BCFI Gradient Background ===== */
 .bcfi-gradient-bg {
-  background: linear-gradient(135deg, #D4F0FB 0%, #E8F4FB 30%, #F0F7FC 60%, #FFFFFF 100%);
+  background: #F3F5F9;
   min-height: 100vh;
 }
 
-/* Decorative wave pattern - subtle */
+/* ===== Decorative Wave Pattern ===== */
 .bcfi-wave-pattern {
   position: relative;
 }
@@ -152,19 +169,78 @@
   right: 0;
   width: 50%;
   height: 100%;
-  background: radial-gradient(ellipse at 80% 20%, rgba(58, 159, 225, 0.06) 0%, transparent 60%),
-              radial-gradient(ellipse at 60% 80%, rgba(139, 92, 246, 0.04) 0%, transparent 50%);
+  background:
+    radial-gradient(ellipse at 85% 15%, rgba(58, 159, 225, 0.07) 0%, transparent 55%),
+    radial-gradient(ellipse at 70% 75%, rgba(139, 92, 246, 0.04) 0%, transparent 45%),
+    radial-gradient(ellipse at 50% 40%, rgba(58, 159, 225, 0.03) 0%, transparent 50%);
   pointer-events: none;
   z-index: 0;
 }
 
-/* Card shadow utilities */
-.bcfi-card {
-  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.06), 0 1px 2px -1px rgba(0, 0, 0, 0.06);
-  border-radius: 16px;
+/* ===== Skeleton Shimmer Animation ===== */
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+.skeleton-shimmer {
+  background: linear-gradient(90deg, #F3F4F6 25%, #E8F4FB 50%, #F3F4F6 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s ease-in-out infinite;
+  border-radius: 8px;
 }
 
-.bcfi-card-elevated {
-  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1);
-  border-radius: 16px;
+/* ===== Smooth Transitions ===== */
+.transition-bcfi {
+  transition: all 150ms ease;
 }
+
+/* ===== Focus Ring ===== */
+.focus-bcfi:focus-visible {
+  outline: 2px solid #3A9FE1;
+  outline-offset: 2px;
+}
+
+/* ===== Card Variants ===== */
+.bcfi-card {
+  background: white;
+  border-radius: 16px;
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.04), 0 1px 2px -1px rgba(0, 0, 0, 0.04);
+  border: 1px solid #F3F4F6;
+}
+.bcfi-card-elevated {
+  background: white;
+  border-radius: 16px;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.08), 0 2px 4px -2px rgba(0, 0, 0, 0.06);
+  border: 1px solid #F3F4F6;
+}
+.bcfi-card-dark {
+  background: linear-gradient(135deg, #212861 0%, #3A4B7F 100%);
+  border-radius: 16px;
+  color: white;
+  position: relative;
+  overflow: hidden;
+}
+.bcfi-card-dark::after {
+  content: '';
+  position: absolute;
+  top: -30%;
+  right: -20%;
+  width: 60%;
+  height: 160%;
+  background: radial-gradient(ellipse, rgba(58, 159, 225, 0.12) 0%, transparent 70%);
+  pointer-events: none;
+}
+
+/* ===== Hidden Scrollbar ===== */
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
+/* ===== Stat Number Sizes ===== */
+.stat-hero { font-size: 36px; font-weight: 700; line-height: 1; }
+.stat-large { font-size: 28px; font-weight: 700; line-height: 1.1; }
+.stat-medium { font-size: 20px; font-weight: 600; line-height: 1.2; }

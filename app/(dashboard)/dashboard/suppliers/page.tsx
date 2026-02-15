@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Plus, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Card, CardContent } from "@/components/ui/card";
 import {
   Select,
   SelectContent,
@@ -160,15 +161,19 @@ function SuppliersPageContent() {
       )}
 
       {data && (
-        <SuppliersTable
-          data={data.suppliers}
-          currentPage={page}
-          totalPages={data.pages}
-          pageSize={pageSize}
-          onPageChange={handlePageChange}
-          onPageSizeChange={handlePageSizeChange}
-          onSort={handleSort}
-        />
+        <Card>
+          <CardContent className="p-6">
+            <SuppliersTable
+              data={data.suppliers}
+              currentPage={page}
+              totalPages={data.pages}
+              pageSize={pageSize}
+              onPageChange={handlePageChange}
+              onPageSizeChange={handlePageSizeChange}
+              onSort={handleSort}
+            />
+          </CardContent>
+        </Card>
       )}
 
       {isPending && (

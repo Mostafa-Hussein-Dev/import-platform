@@ -145,6 +145,48 @@ export default async function ShippingCompanyViewPage({
           </CardContent>
         </Card>
 
+        {/* Recent Shipments */}
+        {company.shipments.length > 0 && (
+          <Card>
+            <CardHeader>
+              <CardTitle>Recent Shipments ({company.shipments.length})</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3">
+                {company.shipments.map((shipment) => (
+                  <div
+                    key={shipment.id}
+                    className="flex items-center justify-between border-b border-[#F3F4F6] pb-3 last:border-0 last:pb-0"
+                  >
+                    <div>
+                      <p className="font-medium text-[#212861]">{shipment.shipmentNumber}</p>
+                      <p className="text-sm text-[#6B7280]">
+                        {shipment.method} · {shipment.departureDate ? new Date(shipment.departureDate).toLocaleDateString() : "TBD"}
+                      </p>
+                    </div>
+                    <div className="text-right">
+                      <Badge
+                        className={
+                          shipment.status === "delivered"
+                            ? "bg-emerald-100 text-emerald-700 hover:bg-emerald-100"
+                            : shipment.status === "pending"
+                            ? "bg-[#F3F4F6] text-[#6B7280] hover:bg-[#F3F4F6]"
+                            : "bg-blue-100 text-blue-700 hover:bg-blue-100"
+                          }
+                      >
+                        {shipment.status}
+                      </Badge>
+                      <p className="text-sm font-medium text-[#212861] mt-1">
+                        ${shipment.totalCost.toFixed(2)}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
         {/* Notes */}
         {company.notes && (
           <Card className="md:col-span-2">
@@ -157,48 +199,6 @@ export default async function ShippingCompanyViewPage({
           </Card>
         )}
       </div>
-
-      {/* Recent Shipments */}
-      {company.shipments.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Recent Shipments ({company.shipments.length})</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              {company.shipments.map((shipment) => (
-                <div
-                  key={shipment.id}
-                  className="flex items-center justify-between border-b border-gray-100 pb-3 last:border-0 last:pb-0"
-                >
-                  <div>
-                    <p className="font-medium text-[#212861]">{shipment.shipmentNumber}</p>
-                    <p className="text-sm text-[#6B7280]">
-                      {shipment.method} · {shipment.departureDate ? new Date(shipment.departureDate).toLocaleDateString() : "TBD"}
-                    </p>
-                  </div>
-                  <div className="text-right">
-                    <Badge
-                      className={
-                        shipment.status === "delivered"
-                          ? "bg-emerald-100 text-emerald-700 hover:bg-emerald-100"
-                          : shipment.status === "pending"
-                          ? "bg-[#F3F4F6] text-[#6B7280] hover:bg-[#F3F4F6]"
-                          : "bg-blue-100 text-blue-700 hover:bg-blue-100"
-                        }
-                    >
-                      {shipment.status}
-                    </Badge>
-                    <p className="text-sm font-medium text-[#212861] mt-1">
-                      ${shipment.totalCost.toFixed(2)}
-                    </p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      )}
     </div>
   );
 }

@@ -73,3 +73,15 @@ export type ShipmentFilterData = z.infer<typeof shipmentFilterSchema>;
 export const updateShipmentStatusSchema = z.object({
   status: z.enum(["pending", "in_transit", "customs", "delivered"]),
 });
+
+export const recordShipmentPaymentSchema = z.object({
+  amount: z.union([z.string().min(0.01, "Amount must be greater than 0"), z.number().min(0.01, "Amount must be greater than 0")]),
+  date: z.string().default(() => new Date().toISOString()),
+  notes: z.string().max(500).optional(),
+}).transform((data) => ({
+  ...data,
+  amount: typeof data.amount === "string" ? parseFloat(data.amount) : data.amount,
+  date: new Date(data.date),
+}));
+
+export type RecordShipmentPaymentData = z.infer<typeof recordShipmentPaymentSchema>;

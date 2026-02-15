@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Plus, Search, LayoutGrid, Table as TableIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Card, CardContent } from "@/components/ui/card";
 import {
   Select,
   SelectContent,
@@ -214,15 +215,19 @@ function ProductsPageContent() {
       )}
 
       {data && view === "table" && (
-        <ProductsTable
-          data={data.products}
-          currentPage={page}
-          totalPages={data.pages}
-          pageSize={pageSize}
-          onPageChange={handlePageChange}
-          onPageSizeChange={handlePageSizeChange}
-          onSort={handleSort}
-        />
+        <Card>
+          <CardContent className="p-6">
+            <ProductsTable
+              data={data.products}
+              currentPage={page}
+              totalPages={data.pages}
+              pageSize={pageSize}
+              onPageChange={handlePageChange}
+              onPageSizeChange={handlePageSizeChange}
+              onSort={handleSort}
+            />
+          </CardContent>
+        </Card>
       )}
 
       {data && view === "grid" && (

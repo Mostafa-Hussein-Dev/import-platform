@@ -36,9 +36,8 @@ export function DeleteProductButton({ id }: DeleteProductButtonProps) {
   }
 
   return (
-    <Button type="button" variant="destructive" onClick={handleDelete}>
-      <Trash2 className="mr-2 h-4 w-4" />
-      Delete
+    <Button type="button" variant="outline" size="sm" onClick={handleDelete} className="text-red-500 hover:text-red-600">
+      <Trash2 className="h-4 w-4" />
     </Button>
   );
 }

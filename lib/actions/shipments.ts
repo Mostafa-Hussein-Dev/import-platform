@@ -3,8 +3,11 @@
 import { prisma } from "@/lib/prisma";
 import { getServerSession, requireValidUser } from "@/lib/auth";
 import { revalidatePath } from "next/cache";
-import { shipmentFormSchema, shipmentFilterSchema } from "@/lib/validations/shipment";
+import { shipmentFormSchema, shipmentFilterSchema, recordShipmentPaymentSchema } from "@/lib/validations/shipment";
+import type { RecordShipmentPaymentData } from "@/lib/validations/shipment";
+import { processShipmentDelivery } from "@/lib/actions/inventory";
 import type { Prisma } from "@prisma/client";
+import { z } from "zod";
 
 export type ShipmentActionResult<T = unknown> = {
   success: boolean;
@@ -165,18 +168,22 @@ export async function getShipment(id: string): Promise<ShipmentActionResult<{
     poNumber: string;
     supplier: { id: string; companyName: string };
     items: Array<{
-      product: { name: string; sku: string };
-      quantity: number;
-    }>;
-    };
-    shippingCompany: {
       id: string;
-      name: string;
-      type: string;
-      contactPerson: string | null;
-      email: string | null;
-      phone: string | null;
-    };
+      quantity: number;
+      unitCost: number;
+      receivedQty: number;
+      product: {
+        id: string;
+        name: string;
+        sku: string;
+        weightKg: number | null;
+      };
+    }>;
+  };
+  shippingCompany: {
+    id: string;
+    name: string;
+  };
     method: string;
     departureDate: Date | null;
     estimatedArrival: Date | null;
@@ -189,6 +196,8 @@ export async function getShipment(id: string): Promise<ShipmentActionResult<{
     customsDuty: number | null;
     otherFees: number | null;
     totalCost: number;
+    paymentStatus: string;
+    paidAmount: number;
     notes: string | null;
     createdBy: string | null;
     createdAt: Date;
@@ -208,7 +217,14 @@ export async function getShipment(id: string): Promise<ShipmentActionResult<{
             supplier: { select: { id: true, companyName: true } },
             items: {
               include: {
-                product: { select: { name: true, sku: true } },
+                product: {
+                  select: {
+                    id: true,
+                    name: true,
+                    sku: true,
+                    weightKg: true,
+                  },
+                },
               },
             },
           },
@@ -231,11 +247,22 @@ export async function getShipment(id: string): Promise<ShipmentActionResult<{
           poNumber: shipment.purchaseOrder.poNumber,
           supplier: { id: shipment.purchaseOrder.supplier.id, companyName: shipment.purchaseOrder.supplier.companyName },
           items: shipment.purchaseOrder.items.map((item) => ({
-            product: { name: item.product.name, sku: item.product.sku },
+            id: item.id,
             quantity: item.quantity,
+            unitCost: Number(item.unitCost),
+            receivedQty: item.receivedQty,
+            product: {
+              id: item.product.id,
+              name: item.product.name,
+              sku: item.product.sku,
+              weightKg: item.product.weightKg ? Number(item.product.weightKg) : null,
+            },
           })),
         },
-        shippingCompany: shipment.shippingCompany,
+        shippingCompany: {
+          id: shipment.shippingCompany.id,
+          name: shipment.shippingCompany.name,
+        },
         method: shipment.method,
         departureDate: shipment.departureDate,
         estimatedArrival: shipment.estimatedArrival,
@@ -248,6 +275,8 @@ export async function getShipment(id: string): Promise<ShipmentActionResult<{
         customsDuty: shipment.customsDuty ? Number(shipment.customsDuty) : null,
         otherFees: shipment.otherFees ? Number(shipment.otherFees) : null,
         totalCost: Number(shipment.totalCost),
+        paymentStatus: shipment.paymentStatus,
+        paidAmount: Number(shipment.paidAmount),
         notes: shipment.notes,
         createdBy: shipment.createdBy,
         createdAt: shipment.createdAt,
@@ -503,21 +532,81 @@ export async function updateShipmentStatus(
       data: updates,
     });
 
-    // If marking as delivered, update PO status to received
+    // If marking as delivered, update PO status to received and process stock
     if (status === "delivered" && shipment?.purchaseOrder) {
+      // First update the PO status
       await prisma.purchaseOrder.update({
         where: { id: shipment.purchaseOrderId },
         data: { status: "received" },
       });
+
+      // Process stock movements and landed costs
+      const stockResult = await processShipmentDelivery(id, session.user.id);
+      if (!stockResult.success) {
+        console.error("Failed to process shipment delivery:", stockResult.error);
+        // Don't fail the status update, but log the error
+      }
     }
 
     revalidatePath("/dashboard/shipments");
     revalidatePath("/dashboard/purchase-orders");
+    revalidatePath("/dashboard/inventory");
 
     return { success: true };
   } catch (error) {
     console.error("Error updating shipment status:", error);
     return { success: false, error: "Failed to update shipment status" };
+  }
+}
+
+export async function recordShipmentPayment(
+  id: string,
+  data: z.input<typeof recordShipmentPaymentSchema>
+): Promise<ShipmentActionResult> {
+  try {
+    const session = await getServerSession();
+    if (!session?.user?.id) {
+      return { success: false, error: "Not authenticated" };
+    }
+
+    const shipment = await prisma.shipment.findUnique({
+      where: { id },
+    });
+
+    if (!shipment) {
+      return { success: false, error: "Shipment not found" };
+    }
+
+    const validatedData = recordShipmentPaymentSchema.parse(data);
+
+    const newPaidAmount = Number(shipment.paidAmount) + validatedData.amount;
+
+    if (newPaidAmount > Number(shipment.totalCost)) {
+      return { success: false, error: "Payment amount exceeds total cost" };
+    }
+
+    let paymentStatus: string = shipment.paymentStatus;
+    if (newPaidAmount >= Number(shipment.totalCost)) {
+      paymentStatus = "paid";
+    } else if (newPaidAmount > 0) {
+      paymentStatus = "partial";
+    }
+
+    await prisma.shipment.update({
+      where: { id },
+      data: {
+        paidAmount: newPaidAmount,
+        paymentStatus,
+      },
+    });
+
+    revalidatePath("/dashboard/shipments");
+    revalidatePath(`/dashboard/shipments/${id}`);
+
+    return { success: true };
+  } catch (error) {
+    console.error("Error recording shipment payment:", error);
+    return { success: false, error: "Failed to record payment" };
   }
 }
 

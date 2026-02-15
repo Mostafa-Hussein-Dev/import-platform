@@ -98,7 +98,7 @@ export function PotentialProductCard({
           )}
 
           {/* Actions */}
-          <div className="flex items-center justify-between pt-2 border-t border-gray-100">
+          <div className="flex items-center justify-between pt-2 border-t border-[#F3F4F6]">
             <div className="flex gap-1">
               <TooltipProvider>
                 <Tooltip>

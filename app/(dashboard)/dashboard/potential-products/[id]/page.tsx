@@ -184,7 +184,7 @@ export default function ViewPotentialProductPage({
                   href={potentialProduct.sourceUrl}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-blue-600 hover:underline flex items-center gap-1"
+                  className="text-[#3A9FE1] hover:underline flex items-center gap-1"
                 >
                   <ExternalLink className="h-4 w-4" />
                   View Source
@@ -257,7 +257,7 @@ export default function ViewPotentialProductPage({
                   <p className="text-sm text-[#6B7280]">Supplier</p>
                   <Link
                     href={`/dashboard/suppliers/${potentialProduct.supplier.id}`}
-                    className="font-medium text-blue-600 hover:underline"
+                    className="font-medium text-[#3A9FE1] hover:underline"
                   >
                     {potentialProduct.supplier.companyName}
                   </Link>

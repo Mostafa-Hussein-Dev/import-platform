@@ -14,6 +14,7 @@ import {
   Truck,
   Building,
   X,
+  Warehouse,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useState } from "react";
@@ -23,21 +24,6 @@ const navItems = [
     title: "Dashboard",
     href: "/dashboard",
     icon: LayoutDashboard,
-  },
-  {
-    title: "Purchase Orders",
-    href: "/dashboard/purchase-orders",
-    icon: ShoppingCart,
-  },
-  {
-    title: "Shipments",
-    href: "/dashboard/shipments",
-    icon: Truck,
-  },
-  {
-    title: "Shipping Companies",
-    href: "/dashboard/shipping-companies",
-    icon: Building,
   },
   {
     title: "Products",
@@ -53,6 +39,26 @@ const navItems = [
     title: "Suppliers",
     href: "/dashboard/suppliers",
     icon: Factory,
+  },
+  {
+    title: "Inventory",
+    href: "/dashboard/inventory",
+    icon: Warehouse,
+  },
+  {
+    title: "Purchase Orders",
+    href: "/dashboard/purchase-orders",
+    icon: ShoppingCart,
+  },
+  {
+    title: "Shipments",
+    href: "/dashboard/shipments",
+    icon: Truck,
+  },
+  {
+    title: "Shipping Companies",
+    href: "/dashboard/shipping-companies",
+    icon: Building,
   },
   {
     title: "Settings",
@@ -73,7 +79,7 @@ export function Sidebar() {
           variant="ghost"
           size="icon"
           onClick={() => setIsOpen(!isOpen)}
-          className="bg-white shadow-md hover:bg-gray-50"
+          className="bg-white shadow-md hover:bg-[#F9FAFB]"
         >
           {isOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
         </Button>
@@ -90,7 +96,7 @@ export function Sidebar() {
       {/* Sidebar */}
       <aside
         className={cn(
-          "fixed top-0 left-0 z-40 h-screen w-64 bg-white border-r border-gray-100 shadow-[2px_0_8px_rgba(0,0,0,0.04)] transition-transform",
+          "fixed top-0 left-0 z-40 h-screen w-64 bg-white border-r border-[#F3F4F6] shadow-[2px_0_8px_rgba(0,0,0,0.04)] transition-transform",
           isOpen ? "translate-x-0" : "-translate-x-full",
           "lg:translate-x-0"
         )}
@@ -123,7 +129,7 @@ export function Sidebar() {
                     "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-150",
                     isActive
                       ? "bg-[#E8F4FB] text-[#3A9FE1]"
-                      : "text-[#6B7280] hover:bg-gray-50 hover:text-[#212861]"
+                      : "text-[#6B7280] hover:bg-[#F9FAFB] hover:text-[#212861]"
                   )}
                 >
                   <Icon className={cn("h-5 w-5", isActive ? "text-[#3A9FE1]" : "text-[#9CA3AF]")} />
@@ -134,7 +140,7 @@ export function Sidebar() {
           </nav>
 
           {/* Footer */}
-          <div className="p-4 border-t border-gray-100">
+          <div className="p-4 border-t border-[#F3F4F6]">
             <div className="text-xs text-[#9CA3AF] text-center">
               &copy; 2026 Import Platform
             </div>

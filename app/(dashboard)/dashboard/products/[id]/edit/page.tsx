@@ -43,7 +43,8 @@ export default async function EditProductPage({
   };
 
   return (
-    <div className="space-y-6 max-w-3xl">
+    <div className="flex justify-center">
+      <div className="w-full max-w-3xl space-y-6">
       <div>
         <h2 className="text-2xl font-bold text-[#212861]">Edit Product</h2>
         <p className="text-[#6B7280]">
@@ -55,6 +56,7 @@ export default async function EditProductPage({
         id={id}
         initialData={formData}
       />
+      </div>
     </div>
   );
 }

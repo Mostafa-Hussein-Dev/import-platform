@@ -6,6 +6,7 @@ import { revalidatePath } from "next/cache";
 import { purchaseOrderFormSchema, purchaseOrderFilterSchema, updatePurchaseOrderStatusSchema, recordPaymentSchema } from "@/lib/validations/purchase-order";
 import type { PurchaseOrderFormData, PurchaseOrderFilterData, RecordPaymentData } from "@/lib/validations/purchase-order";
 import type { Prisma } from "@prisma/client";
+import { z } from "zod";
 
 export type PurchaseOrderActionResult<T = unknown> = {
   success: boolean;
@@ -461,7 +462,7 @@ export async function updatePurchaseOrderStatus(
 
 export async function recordPayment(
   id: string,
-  data: RecordPaymentData
+  data: z.input<typeof recordPaymentSchema>
 ): Promise<PurchaseOrderActionResult> {
   try {
     const session = await getServerSession();

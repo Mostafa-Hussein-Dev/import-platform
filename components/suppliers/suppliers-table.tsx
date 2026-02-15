@@ -65,107 +65,116 @@ export function SuppliersTable({
       accessorKey: "companyName",
       header: ({ column }) => {
         return (
-          <Button
-            variant="ghost"
-            onClick={() => {
-              const direction = column.getIsSorted() === "asc" ? "desc" : "asc";
-              column.toggleSorting(direction === "asc");
-              onSort("companyName", direction);
-            }}
-            className="h-8 px-2"
-          >
-            Company Name
-            <ArrowUpDown className="ml-2 h-3 w-3" />
-          </Button>
+          <div className="text-center">
+            <Button
+              variant="ghost"
+              onClick={() => {
+                const direction = column.getIsSorted() === "asc" ? "desc" : "asc";
+                column.toggleSorting(direction === "asc");
+                onSort("companyName", direction);
+              }}
+              className="h-8 px-2"
+            >
+              Company Name
+              <ArrowUpDown className="ml-2 h-3 w-3" />
+            </Button>
+          </div>
         );
       },
       cell: ({ row }) => (
-        <div className="font-medium">{row.getValue("companyName")}</div>
+        <div className="text-center font-medium">{row.getValue("companyName")}</div>
       ),
     },
     {
       accessorKey: "contactPerson",
-      header: "Contact Person",
-      cell: ({ row }) => row.getValue("contactPerson") || "N/A",
+      header: () => <div className="text-center">Contact Person</div>,
+      cell: ({ row }) => <div className="text-center">{row.getValue("contactPerson") || "N/A"}</div>,
     },
     {
       accessorKey: "country",
-      header: "Country",
-      cell: ({ row }) => row.getValue("country"),
+      header: () => <div className="text-center">Country</div>,
+      cell: ({ row }) => <div className="text-center">{row.getValue("country")}</div>,
     },
     {
       accessorKey: "email",
-      header: "Email",
+      header: () => <div className="text-center">Email</div>,
       cell: ({ row }) => (
-        <span className="text-sm text-[#6B7280]">
-          {row.getValue("email") || "N/A"}
-        </span>
+        <div className="text-center">
+          <span className="text-sm text-[#6B7280]">
+            {row.getValue("email") || "N/A"}
+          </span>
+        </div>
       ),
     },
     {
       accessorKey: "_count.products",
-      header: "Products",
-      cell: ({ row }) => row.original._count.products,
+      header: () => <div className="text-center">Products</div>,
+      cell: ({ row }) => <div className="text-center">{row.original._count.products}</div>,
     },
     {
       accessorKey: "isActive",
-      header: "Status",
+      header: () => <div className="text-center">Status</div>,
       cell: ({ row }) => {
         const isActive = row.getValue("isActive");
         return (
-          <Badge
-            className={isActive
-              ? "bg-emerald-100 text-emerald-700 hover:bg-emerald-100"
-              : "bg-[#F3F4F6] text-[#6B7280] hover:bg-[#F3F4F6]"
-            }
-          >
-            {isActive ? "Active" : "Inactive"}
-          </Badge>
+          <div className="text-center">
+            <Badge
+              className={isActive
+                ? "bg-emerald-100 text-emerald-700 hover:bg-emerald-100"
+                : "bg-[#F3F4F6] text-[#6B7280] hover:bg-[#F3F4F6]"
+              }
+            >
+              {isActive ? "Active" : "Inactive"}
+            </Badge>
+          </div>
         );
       },
     },
     {
       id: "actions",
+      header: () => <div className="text-center">Actions</div>,
       cell: ({ row }) => {
         const supplier = row.original;
 
         return (
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" className="h-8 w-8 p-0">
-                <span className="sr-only">Open menu</span>
-                <MoreHorizontal className="h-4 w-4" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem asChild>
-                <a href={`/dashboard/suppliers/${supplier.id}`}>
-                  <Eye className="mr-2 h-4 w-4" />
-                  View
-                </a>
-              </DropdownMenuItem>
-              <DropdownMenuItem asChild>
-                <a href={`/dashboard/suppliers/${supplier.id}/edit`}>
-                  <Edit className="mr-2 h-4 w-4" />
-                  Edit
-                </a>
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                className="text-red-600"
-                onClick={async () => {
-                  if (confirm("Are you sure you want to delete this supplier?")) {
-                    await fetch(`/dashboard/suppliers/${supplier.id}/delete`, {
-                      method: "POST",
-                    });
-                    window.location.reload();
-                  }
-                }}
-              >
-                <Trash2 className="mr-2 h-4 w-4" />
-                Delete
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+          <div className="flex justify-center">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" className="h-8 w-8 p-0">
+                  <span className="sr-only">Open menu</span>
+                  <MoreHorizontal className="h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem asChild>
+                  <a href={`/dashboard/suppliers/${supplier.id}`}>
+                    <Eye className="mr-2 h-4 w-4" />
+                    View
+                  </a>
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                  <a href={`/dashboard/suppliers/${supplier.id}/edit`}>
+                    <Edit className="mr-2 h-4 w-4" />
+                    Edit
+                  </a>
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  className="text-red-600"
+                  onClick={async () => {
+                    if (confirm("Are you sure you want to delete this supplier?")) {
+                      await fetch(`/dashboard/suppliers/${supplier.id}/delete`, {
+                        method: "POST",
+                      });
+                      window.location.reload();
+                    }
+                  }}
+                >
+                  <Trash2 className="mr-2 h-4 w-4" />
+                  Delete
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
         );
       },
     },
@@ -181,13 +190,13 @@ export function SuppliersTable({
 
   return (
     <div className="space-y-4">
-      <div className="rounded-md border">
+      <div className="rounded-lg border border-[#F3F4F6] overflow-hidden">
         <Table>
           <TableHeader>
             {table.getHeaderGroups().map((headerGroup) => (
-              <TableRow key={headerGroup.id}>
+              <TableRow key={headerGroup.id} className="bg-[#F9FAFB]">
                 {headerGroup.headers.map((header) => (
-                  <TableHead key={header.id} className="text-center">
+                  <TableHead key={header.id} className="font-semibold text-[#374151]">
                     {header.isPlaceholder
                       ? null
                       : flexRender(
@@ -205,9 +214,10 @@ export function SuppliersTable({
                 <TableRow
                   key={row.id}
                   data-state={row.getIsSelected() && "selected"}
+                  className="hover:bg-[#F9FAFB]"
                 >
                   {row.getVisibleCells().map((cell) => (
-                    <TableCell key={cell.id} className="text-center">
+                    <TableCell key={cell.id}>
                       {flexRender(
                         cell.column.columnDef.cell,
                         cell.getContext()
@@ -220,7 +230,7 @@ export function SuppliersTable({
               <TableRow>
                 <TableCell
                   colSpan={columns.length}
-                  className="h-24 text-center align-middle"
+                  className="h-24 text-center"
                 >
                   No suppliers found.
                 </TableCell>

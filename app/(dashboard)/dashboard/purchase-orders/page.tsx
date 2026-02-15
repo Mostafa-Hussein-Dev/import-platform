@@ -102,7 +102,7 @@ export default async function PurchaseOrdersPage({
             <CardTitle className="text-sm font-medium text-[#6B7280]">
               In Progress
             </CardTitle>
-            <TrendingUp className="h-4 w-4 text-blue-600" />
+            <TrendingUp className="h-4 w-4 text-[#3A9FE1]" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-[#212861]">
@@ -137,12 +137,12 @@ export default async function PurchaseOrdersPage({
               {ordersResult.data.purchaseOrders.map((po) => (
                 <div
                   key={po.id}
-                  className="flex items-center justify-between border-b border-gray-100 pb-4 last:border-0 last:pb-0"
+                  className="flex items-center justify-between border-b border-[#F3F4F6] pb-4 last:border-0 last:pb-0"
                 >
                   <div className="flex-1">
                     <Link
                       href={`/dashboard/purchase-orders/${po.id}`}
-                      className="font-semibold text-[#212861] hover:text-blue-600"
+                      className="font-semibold text-[#212861] hover:text-[#3A9FE1]"
                     >
                       {po.poNumber}
                     </Link>

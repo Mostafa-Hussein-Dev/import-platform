@@ -34,7 +34,7 @@ export default function SettingsPage() {
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="flex items-center gap-4">
-                <div className="h-20 w-20 rounded-full bg-gray-200 flex items-center justify-center">
+                <div className="h-20 w-20 rounded-full bg-[#E5E7EB] flex items-center justify-center">
                   <User className="h-10 w-10 text-[#9CA3AF]" />
                 </div>
                 <div>

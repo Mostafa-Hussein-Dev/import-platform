@@ -16,15 +16,5 @@ export default async function ShipmentViewPage({
     notFound();
   }
 
-  // Strip Decimal fields from shippingCompany to avoid serialization errors
-  const { shippingCompany, ...rest } = result.data;
-  const shipment = {
-    ...rest,
-    shippingCompany: {
-      id: shippingCompany.id,
-      name: shippingCompany.name,
-    },
-  };
-
-  return <ShipmentDetail shipment={shipment} />;
+  return <ShipmentDetail shipment={result.data} />;
 }

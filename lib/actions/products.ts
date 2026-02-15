@@ -23,6 +23,10 @@ export async function getProducts(filters?: ProductFilterData): Promise<ProductA
     wholesalePrice: number;
     currentStock: number;
     reorderLevel: number;
+    moq: number | null;
+    landedCost: number | null;
+    maxLandedCost: number | null;
+    warehouseLocation: string | null;
     status: string;
     createdAt: Date;
     supplier: {
@@ -82,6 +86,23 @@ export async function getProducts(filters?: ProductFilterData): Promise<ProductA
 
     const pages = Math.ceil(total / pageSizeNum);
 
+    // Get max landed cost for each product from stock movements
+    const productIds = productsRaw.map(p => p.id);
+    const maxLandedCosts = await prisma.stockMovement.groupBy({
+      by: ['productId'],
+      where: {
+        productId: { in: productIds },
+        landedCost: { not: null },
+      },
+      _max: {
+        landedCost: true,
+      },
+    });
+
+    const maxLandedCostMap = new Map(
+      maxLandedCosts.map(m => [m.productId, m._max.landedCost ? Number(m._max.landedCost) : null])
+    );
+
     // Convert Decimal to Number for serialization
     const products = productsRaw.map(p => ({
       ...p,
@@ -89,6 +110,7 @@ export async function getProducts(filters?: ProductFilterData): Promise<ProductA
       costPrice: Number(p.costPrice),
       wholesalePrice: Number(p.wholesalePrice),
       landedCost: p.landedCost ? Number(p.landedCost) : null,
+      maxLandedCost: maxLandedCostMap.get(p.id) ?? null,
       weightKg: p.weightKg ? Number(p.weightKg) : null,
       lengthCm: p.lengthCm ? Number(p.lengthCm) : null,
       widthCm: p.widthCm ? Number(p.widthCm) : null,

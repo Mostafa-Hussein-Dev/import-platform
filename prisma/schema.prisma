@@ -122,6 +122,7 @@ model Product {
   supplier         Supplier          @relation(fields: [supplierId], references: [id], onDelete: Restrict)
   potentialProduct PotentialProduct?
   purchaseOrderItems PurchaseOrderItem[]
+  stockMovements   StockMovement[]
 
   @@index([supplierId])
   @@index([status])
@@ -300,6 +301,10 @@ model Shipment {
   otherFees         Decimal?        @db.Decimal(10, 2)
   totalCost         Decimal         @db.Decimal(10, 2)  // sum of all costs
 
+  // Payment tracking
+  paymentStatus     String          @default("pending") // pending, partial, paid
+  paidAmount        Decimal         @db.Decimal(10, 2) @default(0)
+
   notes             String?         @db.Text
 
   createdBy         String?         // User ID from NextAuth
@@ -309,4 +314,38 @@ model Shipment {
   @@index([status])
   @@index([purchaseOrderId])
   @@map("shipments")
+}
+
+// Phase 4: Inventory Management
+
+model StockMovement {
+  id              String    @id @default(cuid())
+  productId       String
+  product         Product   @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  type            String    // "in", "out", "adjustment"
+  reason          String    // "shipment_received", "sale", "damage", "loss", "found", "correction", "return"
+  quantity        Int       // Positive for IN, negative for OUT
+
+  // Reference tracking
+  referenceType   String?   // "PurchaseOrder", "Shipment", "Order", "Manual"
+  referenceId     String?   // ID of the related record
+
+  // Stock levels before and after (for auditing)
+  stockBefore     Int
+  stockAfter      Int
+
+  // Cost tracking for landed cost calculation
+  landedCost      Decimal?  @db.Decimal(10, 2)  // Landed cost per unit after this movement
+  unitCost        Decimal?  @db.Decimal(10, 2)  // Unit cost from PO
+
+  notes           String?   @db.Text
+  createdBy       String?   // User ID from NextAuth
+  createdAt       DateTime  @default(now())
+
+  @@index([productId])
+  @@index([type])
+  @@index([createdAt])
+  @@index([referenceType, referenceId])
+  @@map("stock_movements")
 }

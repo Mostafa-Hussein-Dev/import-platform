@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import { getSupplierCount, getRecentSuppliers } from "@/lib/actions/suppliers";
 import { getProductCount, getActiveProductCount, getLowStockProductCount, getRecentProducts } from "@/lib/actions/products";
 import { getPotentialProductsCount, getApprovedPotentialProducts } from "@/lib/actions/potential-products";
@@ -7,12 +8,15 @@ import {
   getTotalPurchaseOrderValue,
 } from "@/lib/actions/purchase-orders";
 import { getShipmentCount, getRecentShipments } from "@/lib/actions/shipments";
+import { getInventoryStats } from "@/lib/actions/inventory";
+import { getRecentStockMovements } from "@/lib/actions/stock-movements";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Factory, Package, TrendingUp, AlertTriangle, Search, ShoppingCart, Truck, FileText } from "lucide-react";
+import { Factory, Package, TrendingUp, AlertTriangle, Search, ShoppingCart, Truck, FileText, Warehouse } from "lucide-react";
 import Link from "next/link";
 import { MarginDisplay } from "@/components/potential-products/margin-display";
 import { formatCurrency } from "@/lib/utils";
+import { RecentMovementsWidget } from "@/components/dashboard/recent-movements-widget";
 
 // Force dynamic rendering for authenticated routes
 export const dynamic = 'force-dynamic';
@@ -34,6 +38,8 @@ export default async function DashboardPage() {
     recentPOsResult,
     recentShipmentsResult,
     thisMonthPOValueResult,
+    inventoryStatsResult,
+    recentMovementsResult,
   ] = await Promise.all([
     getSupplierCount(),
     getProductCount(),
@@ -52,6 +58,8 @@ export default async function DashboardPage() {
     getTotalPurchaseOrderValue({
       dateFrom: new Date(new Date().getFullYear(), new Date().getMonth(), 1),
     }),
+    getInventoryStats(),
+    getRecentStockMovements(5),
   ]);
 
   const potentialProductsCount = potentialProductsCountResult.success ? potentialProductsCountResult.data : null;
@@ -62,65 +70,77 @@ export default async function DashboardPage() {
   const atCustomsShipments = customsShipmentsResult.success ? customsShipmentsResult.data || 0 : 0;
   const thisMonthPOValue = thisMonthPOValueResult.success ? thisMonthPOValueResult.data || 0 : 0;
 
+  const inventoryValue = inventoryStatsResult.success ? inventoryStatsResult.data?.totalInventoryValue ?? 0 : 0;
+
+  const recentMovements = recentMovementsResult.success ? recentMovementsResult.data ?? [] : [];
+
   const stats = [
     {
       title: "Active POs",
       value: activePOs,
       icon: ShoppingCart,
       href: "/dashboard/purchase-orders",
-      color: "text-blue-600",
-      bgColor: "bg-blue-100",
+      color: "text-[#3A9FE1]",
+      bgColor: "bg-[#E8F4FB]",
     },
     {
       title: "In Transit",
       value: inTransitShipments,
       icon: Truck,
       href: "/dashboard/shipments",
-      color: "text-purple-600",
-      bgColor: "bg-purple-100",
+      color: "text-[#8B5CF6]",
+      bgColor: "bg-[#EDE9FE]",
     },
     {
       title: "At Customs",
       value: atCustomsShipments,
       icon: FileText,
       href: "/dashboard/shipments",
-      color: "text-yellow-600",
-      bgColor: "bg-yellow-100",
+      color: "text-[#F59E0B]",
+      bgColor: "bg-[#FEF3C7]",
+    },
+    {
+      title: "Inventory Value",
+      value: formatCurrency(inventoryValue),
+      icon: Warehouse,
+      href: "/dashboard/inventory",
+      color: "text-[#10B981]",
+      bgColor: "bg-[#D1FAE5]",
     },
     {
       title: "This Month PO Value",
       value: formatCurrency(thisMonthPOValue),
       icon: TrendingUp,
       href: "/dashboard/purchase-orders",
-      color: "text-emerald-600",
-      bgColor: "bg-emerald-100",
+      color: "text-[#212861]",
+      bgColor: "bg-[#E8F4FB]",
     },
   ];
 
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-2xl font-bold text-[#212861]">Welcome back!</h2>
-        <p className="text-[#6B7280]">Here's an overview of your import platform.</p>
+        <h1 className="text-[2rem] font-bold tracking-tight">Welcome back!</h1>
+        <p className="text-[#6B7280] mt-1">Here's an overview of your import platform.</p>
       </div>
 
       {/* Stats Cards */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+      <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-5">
         {stats.map((stat) => {
           const Icon = stat.icon;
           return (
             <Link key={stat.title} href={stat.href}>
-              <Card className="hover:shadow-md transition-shadow">
+              <Card className="hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200 group">
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium text-[#6B7280]">
+                  <CardTitle className="text-xs font-semibold uppercase tracking-wider text-[#6B7280]">
                     {stat.title}
                   </CardTitle>
-                  <div className={`p-2 rounded-lg ${stat.bgColor}`}>
-                    <Icon className={`h-4 w-4 ${stat.color}`} />
+                  <div className={`p-2.5 rounded-xl ${stat.bgColor} group-hover:scale-110 transition-transform duration-200`}>
+                    <Icon className={`h-5 w-5 ${stat.color}`} />
                   </div>
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold text-[#212861]">{stat.value}</div>
+                  <div className="stat-large text-[#212861]">{stat.value}</div>
                 </CardContent>
               </Card>
             </Link>
@@ -128,14 +148,24 @@ export default async function DashboardPage() {
         })}
       </div>
 
-      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+      <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-3">
+        {/* Recent Stock Movements */}
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between">
+            <CardTitle>Recent Stock Movements</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <RecentMovementsWidget movements={recentMovements} />
+          </CardContent>
+        </Card>
+
         {/* Recent Purchase Orders */}
         <Card>
           <CardHeader className="flex flex-row items-center justify-between">
             <CardTitle>Recent Purchase Orders</CardTitle>
             <Link
               href="/dashboard/purchase-orders"
-              className="text-sm text-blue-600 hover:underline"
+              className="text-sm font-semibold text-[#3A9FE1] hover:text-[#2E8FD1] transition-colors"
             >
               View All
             </Link>
@@ -179,7 +209,7 @@ export default async function DashboardPage() {
             <CardTitle>Active Shipments</CardTitle>
             <Link
               href="/dashboard/shipments"
-              className="text-sm text-blue-600 hover:underline"
+              className="text-sm font-semibold text-[#3A9FE1] hover:text-[#2E8FD1] transition-colors"
             >
               View All
             </Link>
@@ -218,7 +248,7 @@ export default async function DashboardPage() {
             <CardTitle>Ready to Convert</CardTitle>
             <Link
               href="/dashboard/potential-products?status=APPROVED"
-              className="text-sm text-blue-600 hover:underline"
+              className="text-sm font-semibold text-[#3A9FE1] hover:text-[#2E8FD1] transition-colors"
             >
               View All
             </Link>

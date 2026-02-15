@@ -86,7 +86,7 @@ export default async function ViewSupplierPage({
                   href={supplier.website}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="font-medium text-blue-600 hover:underline flex items-center gap-1"
+                  className="font-medium text-[#3A9FE1] hover:underline flex items-center gap-1"
                 >
                   <Globe className="h-4 w-4" />
                   {supplier.website}
@@ -107,7 +107,7 @@ export default async function ViewSupplierPage({
                 <p className="text-sm text-[#6B7280]">Email</p>
                 <a
                   href={`mailto:${supplier.email}`}
-                  className="font-medium text-blue-600 hover:underline flex items-center gap-1"
+                  className="font-medium text-[#3A9FE1] hover:underline flex items-center gap-1"
                 >
                   <Mail className="h-4 w-4" />
                   {supplier.email}
@@ -202,7 +202,7 @@ export default async function ViewSupplierPage({
                     <TableCell className="font-medium">
                       <Link
                         href={`/dashboard/products/${product.id}`}
-                        className="text-blue-600 hover:underline"
+                        className="text-[#3A9FE1] hover:underline"
                       >
                         {product.name}
                       </Link>

@@ -310,13 +310,13 @@ export function ProductsTable({
 
   return (
     <div className="space-y-4">
-      <div className="rounded-md border">
+      <div className="rounded-lg border border-[#F3F4F6] overflow-hidden">
         <Table>
           <TableHeader>
             {table.getHeaderGroups().map((headerGroup) => (
-              <TableRow key={headerGroup.id}>
+              <TableRow key={headerGroup.id} className="bg-[#F9FAFB]">
                 {headerGroup.headers.map((header) => (
-                  <TableHead key={header.id} className="text-center">
+                  <TableHead key={header.id} className="font-semibold text-[#374151]">
                     {header.isPlaceholder
                       ? null
                       : flexRender(
@@ -334,9 +334,10 @@ export function ProductsTable({
                 <TableRow
                   key={row.id}
                   data-state={row.getIsSelected() && "selected"}
+                  className="hover:bg-[#F9FAFB]"
                 >
                   {row.getVisibleCells().map((cell) => (
-                    <TableCell key={cell.id} className="text-center">
+                    <TableCell key={cell.id}>
                       {flexRender(
                         cell.column.columnDef.cell,
                         cell.getContext()
@@ -349,7 +350,7 @@ export function ProductsTable({
               <TableRow>
                 <TableCell
                   colSpan={columns.length}
-                  className="h-24 text-center align-middle"
+                  className="h-24 text-center"
                 >
                   No products found.
                 </TableCell>
