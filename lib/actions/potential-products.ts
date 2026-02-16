@@ -2,7 +2,7 @@
 
 import { prisma } from "@/lib/prisma";
 import { getServerSession, requireValidUser } from "@/lib/auth";
-import { revalidatePath } from "next/cache";
+import { revalidatePath, revalidateTag, unstable_cache } from "next/cache";
 import {
   potentialProductFormSchema,
   potentialProductFilterSchema,
@@ -105,6 +105,10 @@ export async function getPotentialProducts(
       ...p,
       estimatedCost: p.estimatedCost ? Number(p.estimatedCost) : null,
       estimatedPrice: p.estimatedPrice ? Number(p.estimatedPrice) : null,
+      weightKg: p.weightKg ? Number(p.weightKg) : null,
+      lengthCm: p.lengthCm ? Number(p.lengthCm) : null,
+      widthCm: p.widthCm ? Number(p.widthCm) : null,
+      heightCm: p.heightCm ? Number(p.heightCm) : null,
     }));
 
     return { success: true, data: { potentialProducts, total, pages } };
@@ -236,6 +240,8 @@ export async function createPotentialProduct(
       },
     });
 
+    revalidateTag("potential-products", {});
+    revalidateTag("dashboard", {});
     revalidatePath("/dashboard/potential-products");
 
     return { success: true, data: { id: potentialProduct.id } };
@@ -295,6 +301,8 @@ export async function updatePotentialProduct(
       },
     });
 
+    revalidateTag("potential-products", {});
+    revalidateTag("dashboard", {});
     revalidatePath("/dashboard/potential-products");
     revalidatePath(`/dashboard/potential-products/${id}`);
 
@@ -341,6 +349,8 @@ export async function deletePotentialProduct(
       where: { id },
     });
 
+    revalidateTag("potential-products", {});
+    revalidateTag("dashboard", {});
     revalidatePath("/dashboard/potential-products");
 
     return { success: true };
@@ -388,6 +398,8 @@ export async function updatePotentialProductStatus(
       data: { status: newStatus },
     });
 
+    revalidateTag("potential-products", {});
+    revalidateTag("dashboard", {});
     revalidatePath("/dashboard/potential-products");
     revalidatePath(`/dashboard/potential-products/${id}`);
 
@@ -496,6 +508,8 @@ export async function convertToProduct(
       },
     });
 
+    revalidateTag("potential-products", {});
+    revalidateTag("dashboard", {});
     revalidatePath("/dashboard/potential-products");
     revalidatePath(`/dashboard/potential-products/${id}`);
     revalidatePath("/dashboard/products");

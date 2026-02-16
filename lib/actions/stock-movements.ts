@@ -1,7 +1,7 @@
 "use server";
 
 import { prisma } from "@/lib";
-import { revalidatePath } from "next/cache";
+import { revalidatePath, revalidateTag, unstable_cache } from "next/cache";
 import {
   stockMovementSchema,
   stockAdjustmentSchema,
@@ -250,6 +250,9 @@ export async function createStockMovement(
     });
 
     // Revalidate paths
+    revalidateTag("stock-movements", {});
+    revalidateTag("inventory", {});
+    revalidateTag("dashboard", {});
     revalidatePath("/dashboard/inventory");
     revalidatePath("/dashboard/products");
     revalidatePath(`/dashboard/products/${validatedData.productId}`);
@@ -342,6 +345,9 @@ export async function createBulkStockMovements(
     });
 
     // Revalidate paths
+    revalidateTag("stock-movements", {});
+    revalidateTag("inventory", {});
+    revalidateTag("dashboard", {});
     revalidatePath("/dashboard/inventory");
     revalidatePath("/dashboard/products");
     productsUpdated.forEach((id) => {
@@ -419,6 +425,9 @@ export async function adjustStock(
     });
 
     // Revalidate paths
+    revalidateTag("stock-movements", {});
+    revalidateTag("inventory", {});
+    revalidateTag("dashboard", {});
     revalidatePath("/dashboard/inventory");
     revalidatePath("/dashboard/products");
     revalidatePath(`/dashboard/products/${validatedData.productId}`);
@@ -509,55 +518,59 @@ export async function getStockHistory(
 /**
  * Get recent stock movements across all products
  */
-export async function getRecentStockMovements(
-  limit: number = 5
-): Promise<StockMovementActionResult<Array<{
-  id: string;
-  type: string;
-  reason: string;
-  quantity: number;
-  stockBefore: number;
-  stockAfter: number;
-  landedCost: number | null;
-  unitCost: number | null;
-  notes: string | null;
-  createdAt: Date;
-  product: {
+export const getRecentStockMovements = unstable_cache(
+  async (
+    limit: number = 5
+  ): Promise<StockMovementActionResult<Array<{
     id: string;
-    name: string;
-    sku: string;
-    images: string[];
-  };
-}>>> {
-  try {
-    const movementsRaw = await prisma.stockMovement.findMany({
-      take: limit,
-      orderBy: { createdAt: "desc" },
-      include: {
-        product: {
-          select: {
-            id: true,
-            name: true,
-            sku: true,
-            images: true,
+    type: string;
+    reason: string;
+    quantity: number;
+    stockBefore: number;
+    stockAfter: number;
+    landedCost: number | null;
+    unitCost: number | null;
+    notes: string | null;
+    createdAt: Date;
+    product: {
+      id: string;
+      name: string;
+      sku: string;
+      images: string[];
+    };
+  }>>> => {
+    try {
+      const movementsRaw = await prisma.stockMovement.findMany({
+        take: limit,
+        orderBy: { createdAt: "desc" },
+        include: {
+          product: {
+            select: {
+              id: true,
+              name: true,
+              sku: true,
+              images: true,
+            },
           },
         },
-      },
-    });
+      });
 
-    // Convert Decimal to Number for serialization
-    const movements = movementsRaw.map((m) => ({
-      ...m,
-      landedCost: m.landedCost ? Number(m.landedCost) : null,
-      unitCost: m.unitCost ? Number(m.unitCost) : null,
-    }));
+      // Convert Decimal to Number for serialization
+      const movements = movementsRaw.map((m) => ({
+        ...m,
+        landedCost: m.landedCost ? Number(m.landedCost) : null,
+        unitCost: m.unitCost ? Number(m.unitCost) : null,
+      }));
 
-    return { success: true, data: movements };
-  } catch (error) {
-    console.error("Error fetching recent stock movements:", error);
-    return { success: false, error: "Failed to fetch recent movements" };
-  }
-}
+      return { success: true, data: movements };
+    } catch (error) {
+      console.error("Error fetching recent stock movements:", error);
+      return { success: false, error: "Failed to fetch recent movements" };
+    }
+  },
+  ["recent-stock-movements"],
+  { revalidate: 30, tags: ["stock-movements"] }
+);
 
 /**
  * Delete a stock movement (admin only - use with caution)
@@ -599,6 +612,9 @@ export async function deleteStockMovement(
     });
 
     // Revalidate paths
+    revalidateTag("stock-movements", {});
+    revalidateTag("inventory", {});
+    revalidateTag("dashboard", {});
     revalidatePath("/dashboard/inventory");
     revalidatePath("/dashboard/products");
     revalidatePath(`/dashboard/products/${movement.productId}`);

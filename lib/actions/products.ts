@@ -1,7 +1,7 @@
 "use server";
 
 import { prisma } from "@/lib";
-import { revalidatePath } from "next/cache";
+import { revalidatePath, revalidateTag, unstable_cache } from "next/cache";
 import { productFormSchema, productFilterSchema } from "@/lib/validations/product";
 import type { ProductFormData, ProductFilterData } from "@/lib/validations/product";
 import type { Prisma } from "@prisma/client";
@@ -199,6 +199,8 @@ export async function createProduct(data: ProductFormData): Promise<ProductActio
       data: validatedData,
     });
 
+    revalidateTag("products", {});
+    revalidateTag("dashboard", {});
     revalidatePath("/dashboard/products");
 
     return { success: true, data: { id: product.id } };
@@ -223,6 +225,8 @@ export async function updateProduct(
       data: validatedData,
     });
 
+    revalidateTag("products", {});
+    revalidateTag("dashboard", {});
     revalidatePath("/dashboard/products");
     revalidatePath(`/dashboard/products/${id}`);
 
@@ -242,6 +246,8 @@ export async function deleteProduct(id: string): Promise<ProductActionResult> {
       where: { id },
     });
 
+    revalidateTag("products", {});
+    revalidateTag("dashboard", {});
     revalidatePath("/dashboard/products");
 
     return { success: true };
@@ -278,77 +284,93 @@ export async function getProductsBySupplier(
   }
 }
 
-export async function getProductCount(): Promise<ProductActionResult<number>> {
-  try {
-    const count = await prisma.product.count();
-    return { success: true, data: count };
-  } catch (error) {
-    console.error("Error getting product count:", error);
-    return { success: false, error: "Failed to get product count" };
-  }
-}
+export const getProductCount = unstable_cache(
+  async (): Promise<ProductActionResult<number>> => {
+    try {
+      const count = await prisma.product.count();
+      return { success: true, data: count };
+    } catch (error) {
+      console.error("Error getting product count:", error);
+      return { success: false, error: "Failed to get product count" };
+    }
+  },
+  ["product-count"],
+  { revalidate: 30, tags: ["products"] }
+);
 
-export async function getActiveProductCount(): Promise<ProductActionResult<number>> {
-  try {
-    const count = await prisma.product.count({
-      where: { status: "ACTIVE" },
-    });
-    return { success: true, data: count };
-  } catch (error) {
-    console.error("Error getting active product count:", error);
-    return { success: false, error: "Failed to get active product count" };
-  }
-}
+export const getActiveProductCount = unstable_cache(
+  async (): Promise<ProductActionResult<number>> => {
+    try {
+      const count = await prisma.product.count({
+        where: { status: "ACTIVE" },
+      });
+      return { success: true, data: count };
+    } catch (error) {
+      console.error("Error getting active product count:", error);
+      return { success: false, error: "Failed to get active product count" };
+    }
+  },
+  ["active-product-count"],
+  { revalidate: 30, tags: ["products"] }
+);
 
-export async function getLowStockProductCount(): Promise<ProductActionResult<number>> {
-  try {
-    const count = await prisma.product.count({
-      where: {
-        currentStock: {
-          lt: prisma.product.fields.reorderLevel,
-        },
-      },
-    });
-    return { success: true, data: count };
-  } catch (error) {
-    console.error("Error getting low stock count:", error);
-    return { success: false, error: "Failed to get low stock count" };
-  }
-}
-
-export async function getRecentProducts(limit: number = 5): Promise<ProductActionResult<Array<{
-  id: string;
-  name: string;
-  sku: string;
-  createdAt: Date;
-  currentStock: number;
-  supplier: {
-    id: string;
-    companyName: string;
-  };
-}>>> {
-  try {
-    const products = await prisma.product.findMany({
-      take: limit,
-      orderBy: { createdAt: "desc" },
-      select: {
-        id: true,
-        name: true,
-        sku: true,
-        createdAt: true,
-        currentStock: true,
-        supplier: {
-          select: {
-            id: true,
-            companyName: true,
+export const getLowStockProductCount = unstable_cache(
+  async (): Promise<ProductActionResult<number>> => {
+    try {
+      const count = await prisma.product.count({
+        where: {
+          currentStock: {
+            lt: prisma.product.fields.reorderLevel,
           },
         },
-      },
-    });
+      });
+      return { success: true, data: count };
+    } catch (error) {
+      console.error("Error getting low stock count:", error);
+      return { success: false, error: "Failed to get low stock count" };
+    }
+  },
+  ["low-stock-product-count"],
+  { revalidate: 30, tags: ["products", "inventory"] }
+);
 
-    return { success: true, data: products };
-  } catch (error) {
-    console.error("Error getting recent products:", error);
-    return { success: false, error: "Failed to get recent products" };
-  }
-}
+export const getRecentProducts = unstable_cache(
+  async (limit: number = 5): Promise<ProductActionResult<Array<{
+    id: string;
+    name: string;
+    sku: string;
+    createdAt: Date;
+    currentStock: number;
+    supplier: {
+      id: string;
+      companyName: string;
+    };
+  }>>> => {
+    try {
+      const products = await prisma.product.findMany({
+        take: limit,
+        orderBy: { createdAt: "desc" },
+        select: {
+          id: true,
+          name: true,
+          sku: true,
+          createdAt: true,
+          currentStock: true,
+          supplier: {
+            select: {
+              id: true,
+              companyName: true,
+            },
+          },
+        },
+      });
+
+      return { success: true, data: products };
+    } catch (error) {
+      console.error("Error getting recent products:", error);
+      return { success: false, error: "Failed to get recent products" };
+    }
+  },
+  ["recent-products"],
+  { revalidate: 30, tags: ["products"] }
+);

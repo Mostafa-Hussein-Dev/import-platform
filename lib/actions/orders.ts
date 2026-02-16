@@ -1,7 +1,7 @@
 "use server";
 
 import { prisma } from "@/lib";
-import { revalidatePath } from "next/cache";
+import { revalidatePath, revalidateTag, unstable_cache } from "next/cache";
 import { orderFormSchema, orderFilterSchema, isValidStatusTransition } from "@/lib/validations/order";
 import type { OrderStatus, OrderWithItems, OrderListItem } from "@/types/order";
 import { Prisma } from "@prisma/client";
@@ -363,10 +363,11 @@ export async function createOrder(
       return order;
     });
 
-    // Revalidate paths
+    // Revalidate
+    revalidateTag("orders", {});
+    revalidateTag("dashboard", {});
+    revalidateTag("analytics", {});
     revalidatePath("/dashboard/orders");
-    revalidatePath("/dashboard/analytics");
-    revalidatePath("/dashboard");
 
     return { success: true, data: serializeOrder(result) as OrderWithItems };
   } catch (error) {
@@ -533,6 +534,8 @@ export async function updateOrder(
       return order;
     });
 
+    revalidateTag("orders", {});
+    revalidateTag("dashboard", {});
     revalidatePath("/dashboard/orders");
     revalidatePath(`/dashboard/orders/${id}`);
 
@@ -572,9 +575,10 @@ export async function deleteOrder(id: string): Promise<OrderActionResult> {
       where: { id },
     });
 
+    revalidateTag("orders", {});
+    revalidateTag("dashboard", {});
+    revalidateTag("analytics", {});
     revalidatePath("/dashboard/orders");
-    revalidatePath("/dashboard/analytics");
-    revalidatePath("/dashboard");
 
     return { success: true };
   } catch (error) {
@@ -718,10 +722,12 @@ export async function updateOrderStatus(
       return updated;
     });
 
+    revalidateTag("orders", {});
+    revalidateTag("dashboard", {});
+    revalidateTag("inventory", {});
+    revalidateTag("analytics", {});
     revalidatePath("/dashboard/orders");
     revalidatePath(`/dashboard/orders/${id}`);
-    revalidatePath("/dashboard/inventory");
-    revalidatePath("/dashboard/analytics");
 
     return { success: true, data: serializeOrder(updatedOrder) as OrderWithItems };
   } catch (error) {
@@ -802,6 +808,8 @@ export async function recordOrderPayment(
       },
     });
 
+    revalidateTag("orders", {});
+    revalidateTag("dashboard", {});
     revalidatePath("/dashboard/orders");
     revalidatePath(`/dashboard/orders/${id}`);
 
@@ -815,113 +823,121 @@ export async function recordOrderPayment(
 /**
  * Get order statistics for dashboard
  */
-export async function getOrderStats(): Promise<OrderActionResult<{
-  totalOrders: number;
-  totalRevenue: number;
-  monthOrders: number;
-  monthRevenue: number;
-  pendingPaymentOrders: number;
-  pendingPaymentValue: number;
-}>> {
-  try {
-    const now = new Date();
-    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+export const getOrderStats = unstable_cache(
+  async (): Promise<OrderActionResult<{
+    totalOrders: number;
+    totalRevenue: number;
+    monthOrders: number;
+    monthRevenue: number;
+    pendingPaymentOrders: number;
+    pendingPaymentValue: number;
+  }>> => {
+    try {
+      const now = new Date();
+      const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
 
-    const [
-      totalOrders,
-      totalRevenue,
-      monthOrders,
-      monthRevenue,
-      pendingPaymentOrders,
-    ] = await Promise.all([
-      prisma.order.count({
-        where: { status: { not: "cancelled" } },
-      }),
-      prisma.order.aggregate({
-        where: { status: { not: "cancelled" } },
-        _sum: { total: true },
-      }),
-      prisma.order.count({
-        where: {
-          status: { not: "cancelled" },
-          createdAt: { gte: startOfMonth },
-        },
-      }),
-      prisma.order.aggregate({
-        where: {
-          status: { not: "cancelled" },
-          createdAt: { gte: startOfMonth },
-        },
-        _sum: { total: true },
-      }),
-      prisma.order.findMany({
-        where: {
-          status: { not: "cancelled" },
-          paymentStatus: { in: ["pending", "partial"] },
-        },
-        select: { total: true, paidAmount: true },
-      }),
-    ]);
-
-    const pendingPaymentValue = pendingPaymentOrders.reduce(
-      (sum, order) => sum + Number(order.total) - Number(order.paidAmount),
-      0
-    );
-
-    return {
-      success: true,
-      data: {
+      const [
         totalOrders,
-        totalRevenue: Number(totalRevenue._sum.total || 0),
+        totalRevenue,
         monthOrders,
-        monthRevenue: Number(monthRevenue._sum.total || 0),
-        pendingPaymentOrders: pendingPaymentOrders.length,
-        pendingPaymentValue,
-      },
-    };
-  } catch (error) {
-    console.error("Error fetching order stats:", error);
-    return { success: false, error: "Failed to fetch order stats" };
-  }
-}
+        monthRevenue,
+        pendingPaymentOrders,
+      ] = await Promise.all([
+        prisma.order.count({
+          where: { status: { not: "cancelled" } },
+        }),
+        prisma.order.aggregate({
+          where: { status: { not: "cancelled" } },
+          _sum: { total: true },
+        }),
+        prisma.order.count({
+          where: {
+            status: { not: "cancelled" },
+            createdAt: { gte: startOfMonth },
+          },
+        }),
+        prisma.order.aggregate({
+          where: {
+            status: { not: "cancelled" },
+            createdAt: { gte: startOfMonth },
+          },
+          _sum: { total: true },
+        }),
+        prisma.order.findMany({
+          where: {
+            status: { not: "cancelled" },
+            paymentStatus: { in: ["pending", "partial"] },
+          },
+          select: { total: true, paidAmount: true },
+        }),
+      ]);
+
+      const pendingPaymentValue = pendingPaymentOrders.reduce(
+        (sum, order) => sum + Number(order.total) - Number(order.paidAmount),
+        0
+      );
+
+      return {
+        success: true,
+        data: {
+          totalOrders,
+          totalRevenue: Number(totalRevenue._sum.total || 0),
+          monthOrders,
+          monthRevenue: Number(monthRevenue._sum.total || 0),
+          pendingPaymentOrders: pendingPaymentOrders.length,
+          pendingPaymentValue,
+        },
+      };
+    } catch (error) {
+      console.error("Error fetching order stats:", error);
+      return { success: false, error: "Failed to fetch order stats" };
+    }
+  },
+  ["order-stats"],
+  { revalidate: 30, tags: ["orders"] }
+);
 
 /**
  * Get recent orders for dashboard
  */
-export async function getRecentOrders(limit: number = 5): Promise<OrderActionResult<OrderListItem[]>> {
-  try {
-    const orders = await prisma.order.findMany({
-      take: limit,
-      orderBy: { createdAt: "desc" },
-      select: {
-        id: true,
-        orderNumber: true,
-        type: true,
-        customerName: true,
-        status: true,
-        paymentStatus: true,
-        total: true,
-        createdAt: true,
-        _count: {
-          select: {
-            items: true,
+export const getRecentOrders = unstable_cache(
+  async (limit: number = 5): Promise<OrderActionResult<OrderListItem[]>> => {
+    try {
+      const orders = await prisma.order.findMany({
+        take: limit,
+        orderBy: { createdAt: "desc" },
+        select: {
+          id: true,
+          orderNumber: true,
+          type: true,
+          customerName: true,
+          status: true,
+          paymentStatus: true,
+          total: true,
+          createdAt: true,
+          _count: {
+            select: {
+              items: true,
+            },
           },
         },
-      },
-    });
+      });
 
-    return {
-      success: true,
-      data: orders.map((order) => serializeOrder({
-        ...order,
-        itemCount: order._count.items,
-      })) as OrderListItem[],
-    };
-  } catch (error) {
-    console.error("Error fetching recent orders:", error);
-    return { success: false, error: "Failed to fetch recent orders" };
-  }
-}
+      return {
+        success: true,
+        data: orders.map((order) => serializeOrder({
+          ...order,
+          itemCount: order._count.items,
+        })) as OrderListItem[],
+      };
+    } catch (error) {
+      console.error("Error fetching recent orders:", error);
+      return { success: false, error: "Failed to fetch recent orders" };
+    }
+  },
+  ["recent-orders"],
+  { revalidate: 30, tags: ["orders"] }
+);
 
 /**
  * Get products for order selector

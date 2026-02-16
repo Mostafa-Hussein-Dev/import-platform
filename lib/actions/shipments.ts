@@ -2,7 +2,7 @@
 
 import { prisma } from "@/lib/prisma";
 import { getServerSession, requireValidUser } from "@/lib/auth";
-import { revalidatePath } from "next/cache";
+import { revalidatePath, revalidateTag, unstable_cache } from "next/cache";
 import { shipmentFormSchema, shipmentFilterSchema, recordShipmentPaymentSchema } from "@/lib/validations/shipment";
 import type { RecordShipmentPaymentData } from "@/lib/validations/shipment";
 import { processShipmentDelivery } from "@/lib/actions/inventory";
@@ -109,11 +109,11 @@ export async function getShipments(filters?: any): Promise<ShipmentActionResult<
       where.status = status;
     }
 
-    if (dateFrom || dateTo) {
-      where.OR = [
-        { departureDate: { gte: dateFrom } },
-        { estimatedArrival: { lte: dateTo } },
-      ];
+    if (dateFrom) {
+      where.departureDate = { gte: dateFrom };
+    }
+    if (dateTo) {
+      where.estimatedArrival = { lte: dateTo };
     }
 
     const [shipmentsRaw, total] = await Promise.all([
@@ -388,6 +388,8 @@ export async function createShipment(data: any): Promise<ShipmentActionResult<{ 
       data: { status: "shipped" },
     });
 
+    revalidateTag("shipments", {});
+    revalidateTag("dashboard", {});
     revalidatePath("/dashboard/shipments");
     revalidatePath("/dashboard/purchase-orders");
 
@@ -473,6 +475,8 @@ export async function updateShipment(
       data: updates,
     });
 
+    revalidateTag("shipments", {});
+    revalidateTag("dashboard", {});
     revalidatePath("/dashboard/shipments");
     revalidatePath(`/dashboard/shipments/${id}`);
 
@@ -548,6 +552,8 @@ export async function updateShipmentStatus(
       }
     }
 
+    revalidateTag("shipments", {});
+    revalidateTag("dashboard", {});
     revalidatePath("/dashboard/shipments");
     revalidatePath("/dashboard/purchase-orders");
     revalidatePath("/dashboard/inventory");
@@ -600,6 +606,8 @@ export async function recordShipmentPayment(
       },
     });
 
+    revalidateTag("shipments", {});
+    revalidateTag("dashboard", {});
     revalidatePath("/dashboard/shipments");
     revalidatePath(`/dashboard/shipments/${id}`);
 
@@ -639,6 +647,8 @@ export async function deleteShipment(id: string): Promise<ShipmentActionResult> 
       where: { id },
     });
 
+    revalidateTag("shipments", {});
+    revalidateTag("dashboard", {});
     revalidatePath("/dashboard/shipments");
     revalidatePath("/dashboard/purchase-orders");
 
@@ -649,20 +659,24 @@ export async function deleteShipment(id: string): Promise<ShipmentActionResult> 
   }
 }
 
-export async function getShipmentCount(filters?: { status?: string }): Promise<ShipmentActionResult<number>> {
-  try {
-    const where: any = {};
-    if (filters?.status) {
-      where.status = filters.status;
-    }
+export const getShipmentCount = unstable_cache(
+  async (filters?: { status?: string }): Promise<ShipmentActionResult<number>> => {
+    try {
+      const where: any = {};
+      if (filters?.status) {
+        where.status = filters.status;
+      }
 
-    const count = await prisma.shipment.count({ where });
-    return { success: true, data: count };
-  } catch (error) {
-    console.error("Error getting shipment count:", error);
-    return { success: false, error: "Failed to get shipment count" };
-  }
-}
+      const count = await prisma.shipment.count({ where });
+      return { success: true, data: count };
+    } catch (error) {
+      console.error("Error getting shipment count:", error);
+      return { success: false, error: "Failed to get shipment count" };
+    }
+  },
+  ["shipment-count"],
+  { revalidate: 30, tags: ["shipments"] }
+);
 
 type RecentShipment = {
   id: string;
@@ -672,35 +686,39 @@ type RecentShipment = {
   estimatedArrival: Date | null;
 };
 
-export async function getRecentShipments(limit: number = 5): Promise<ShipmentActionResult<RecentShipment[]>> {
-  try {
-    const shipments = await prisma.shipment.findMany({
-      take: limit,
-      orderBy: { createdAt: "desc" },
-      include: {
-        purchaseOrder: {
-          include: {
-            supplier: { select: { companyName: true } },
+export const getRecentShipments = unstable_cache(
+  async (limit: number = 5): Promise<ShipmentActionResult<RecentShipment[]>> => {
+    try {
+      const shipments = await prisma.shipment.findMany({
+        take: limit,
+        orderBy: { createdAt: "desc" },
+        include: {
+          purchaseOrder: {
+            include: {
+              supplier: { select: { companyName: true } },
+            },
           },
+          shippingCompany: { select: { id: true, name: true } },
         },
-        shippingCompany: { select: { id: true, name: true } },
-      },
-    });
+      });
 
-    const data = shipments.map((s) => ({
-      id: s.id,
-      shipmentNumber: s.shipmentNumber,
-      purchaseOrder: {
-        poNumber: s.purchaseOrder.poNumber,
-        supplier: { companyName: s.purchaseOrder.supplier.companyName },
-      },
-      shippingCompany: s.shippingCompany,
-      estimatedArrival: s.estimatedArrival,
-    }));
+      const data = shipments.map((s) => ({
+        id: s.id,
+        shipmentNumber: s.shipmentNumber,
+        purchaseOrder: {
+          poNumber: s.purchaseOrder.poNumber,
+          supplier: { companyName: s.purchaseOrder.supplier.companyName },
+        },
+        shippingCompany: s.shippingCompany,
+        estimatedArrival: s.estimatedArrival,
+      }));
 
-    return { success: true, data };
-  } catch (error) {
-    console.error("Error getting recent shipments:", error);
-    return { success: false, error: "Failed to get recent shipments" };
-  }
-}
+      return { success: true, data };
+    } catch (error) {
+      console.error("Error getting recent shipments:", error);
+      return { success: false, error: "Failed to get recent shipments" };
+    }
+  },
+  ["recent-shipments"],
+  { revalidate: 30, tags: ["shipments"] }
+);

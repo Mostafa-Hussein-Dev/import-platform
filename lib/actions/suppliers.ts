@@ -2,7 +2,7 @@
 
 import { prisma } from "@/lib/prisma";
 import { getServerSession, requireValidUser } from "@/lib/auth";
-import { revalidatePath } from "next/cache";
+import { revalidatePath, revalidateTag, unstable_cache } from "next/cache";
 import { supplierFormSchema, supplierFilterSchema } from "@/lib/validations/supplier";
 import type { SupplierFormData, SupplierFilterData } from "@/lib/validations/supplier";
 import type { Prisma } from "@prisma/client";
@@ -180,6 +180,8 @@ export async function createSupplier(data: SupplierFormData): Promise<SupplierAc
       },
     });
 
+    revalidateTag("suppliers", {});
+    revalidateTag("dashboard", {});
     revalidatePath("/dashboard/suppliers");
 
     return { success: true, data: { id: supplier.id } };
@@ -225,6 +227,8 @@ export async function updateSupplier(
       data: validatedData,
     });
 
+    revalidateTag("suppliers", {});
+    revalidateTag("dashboard", {});
     revalidatePath("/dashboard/suppliers");
     revalidatePath(`/dashboard/suppliers/${id}`);
 
@@ -263,6 +267,8 @@ export async function deleteSupplier(id: string): Promise<SupplierActionResult> 
       where: { id },
     });
 
+    revalidateTag("suppliers", {});
+    revalidateTag("dashboard", {});
     revalidatePath("/dashboard/suppliers");
 
     return { success: true };
@@ -272,39 +278,47 @@ export async function deleteSupplier(id: string): Promise<SupplierActionResult> 
   }
 }
 
-export async function getSupplierCount(): Promise<SupplierActionResult<number>> {
-  try {
-    const count = await prisma.supplier.count();
-    return { success: true, data: count };
-  } catch (error) {
-    console.error("Error getting supplier count:", error);
-    return { success: false, error: "Failed to get supplier count" };
-  }
-}
+export const getSupplierCount = unstable_cache(
+  async (): Promise<SupplierActionResult<number>> => {
+    try {
+      const count = await prisma.supplier.count();
+      return { success: true, data: count };
+    } catch (error) {
+      console.error("Error getting supplier count:", error);
+      return { success: false, error: "Failed to get supplier count" };
+    }
+  },
+  ["supplier-count"],
+  { revalidate: 30, tags: ["suppliers"] }
+);
 
-export async function getRecentSuppliers(limit: number = 5): Promise<SupplierActionResult<Array<{
-  id: string;
-  companyName: string;
-  contactPerson: string | null;
-  country: string;
-  createdAt: Date;
-}>>> {
-  try {
-    const suppliers = await prisma.supplier.findMany({
-      take: limit,
-      orderBy: { createdAt: "desc" },
-      select: {
-        id: true,
-        companyName: true,
-        contactPerson: true,
-        country: true,
-        createdAt: true,
-      },
-    });
+export const getRecentSuppliers = unstable_cache(
+  async (limit: number = 5): Promise<SupplierActionResult<Array<{
+    id: string;
+    companyName: string;
+    contactPerson: string | null;
+    country: string;
+    createdAt: Date;
+  }>>> => {
+    try {
+      const suppliers = await prisma.supplier.findMany({
+        take: limit,
+        orderBy: { createdAt: "desc" },
+        select: {
+          id: true,
+          companyName: true,
+          contactPerson: true,
+          country: true,
+          createdAt: true,
+        },
+      });
 
-    return { success: true, data: suppliers };
-  } catch (error) {
-    console.error("Error getting recent suppliers:", error);
-    return { success: false, error: "Failed to get recent suppliers" };
-  }
-}
+      return { success: true, data: suppliers };
+    } catch (error) {
+      console.error("Error getting recent suppliers:", error);
+      return { success: false, error: "Failed to get recent suppliers" };
+    }
+  },
+  ["recent-suppliers"],
+  { revalidate: 30, tags: ["suppliers"] }
+);

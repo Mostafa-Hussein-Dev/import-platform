@@ -1,6 +1,7 @@
 "use server";
 
 import { prisma } from "@/lib";
+import { unstable_cache } from "next/cache";
 import { Prisma } from "@prisma/client";
 
 export type AnalyticsActionResult<T = unknown> = {
@@ -12,7 +13,8 @@ export type AnalyticsActionResult<T = unknown> = {
 /**
  * Get revenue metrics
  */
-export async function getRevenueMetrics(
+export const getRevenueMetrics = unstable_cache(
+  async (
   period: "all" | "month" | "lastMonth" = "all"
 ): Promise<AnalyticsActionResult<{
   totalRevenue: number;
@@ -21,7 +23,7 @@ export async function getRevenueMetrics(
   ordersCount: number;
   avgOrderValue: number;
   growthRate: number;
-}>> {
+}>> => {
   try {
     const now = new Date();
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
@@ -88,12 +90,16 @@ export async function getRevenueMetrics(
     console.error("Error fetching revenue metrics:", error);
     return { success: false, error: "Failed to fetch revenue metrics" };
   }
-}
+  },
+  ["revenue-metrics"],
+  { revalidate: 60, tags: ["analytics", "orders"] }
+);
 
 /**
  * Get profit metrics
  */
-export async function getProfitMetrics(
+export const getProfitMetrics = unstable_cache(
+  async (
   period: "all" | "month" | "lastMonth" = "all"
 ): Promise<AnalyticsActionResult<{
   totalProfit: number;
@@ -101,7 +107,7 @@ export async function getProfitMetrics(
   lastMonthProfit: number;
   profitMargin: number;
   cogsSold: number;
-}>> {
+}>> => {
   try {
     const now = new Date();
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
@@ -169,12 +175,16 @@ export async function getProfitMetrics(
     console.error("Error fetching profit metrics:", error);
     return { success: false, error: "Failed to fetch profit metrics" };
   }
-}
+  },
+  ["profit-metrics"],
+  { revalidate: 60, tags: ["analytics", "orders"] }
+);
 
 /**
  * Get product performance data
  */
-export async function getProductPerformance(
+export const getProductPerformance = unstable_cache(
+  async (
   limit: number = 10
 ): Promise<AnalyticsActionResult<{
   bestSellers: Array<{
@@ -212,39 +222,34 @@ export async function getProductPerformance(
     lastSaleDate: Date | null;
     revenue30Days: number;
   }>;
-}>> {
+}>> => {
   try {
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
-    // Single query for all order items + parallel query for products with stock
-    const [allItems, allProductsWithStock] = await Promise.all([
-      prisma.orderItem.findMany({
+    // DB-level aggregation: all-time stats, recent stats, and products with stock
+    const [allTimeStats, recentStats, allProductsWithStock] = await Promise.all([
+      // All-time aggregation per product
+      prisma.orderItem.groupBy({
+        by: ["productId"],
+        where: {
+          order: { status: { not: "cancelled" } },
+        },
+        _sum: { quantity: true, totalPrice: true },
+        _max: { orderId: true },
+      }),
+      // Last 30 days aggregation per product
+      prisma.orderItem.groupBy({
+        by: ["productId"],
         where: {
           order: {
             status: { not: "cancelled" },
+            createdAt: { gte: thirtyDaysAgo },
           },
         },
-        select: {
-          quantity: true,
-          totalPrice: true,
-          product: {
-            select: {
-              id: true,
-              name: true,
-              sku: true,
-              images: true,
-              landedCost: true,
-              currentStock: true,
-            },
-          },
-          order: {
-            select: {
-              createdAt: true,
-            },
-          },
-        },
+        _sum: { totalPrice: true },
       }),
+      // Products with stock
       prisma.product.findMany({
         where: {
           status: "ACTIVE",
@@ -259,66 +264,60 @@ export async function getProductPerformance(
       }),
     ]);
 
-    // Build all-time stats AND recent stats in a single pass
-    const productStats = new Map<
-      string,
-      {
-        productName: string;
-        productSku: string;
-        productImage: string | null;
-        unitsSold: number;
-        revenue: number;
-        cogs: number;
-        revenue30Days: number;
-        lastSaleDate: Date | null;
-      }
-    >();
+    // Get product details for all products that have sales
+    const productIds = allTimeStats.map((s) => s.productId);
+    const products = productIds.length > 0
+      ? await prisma.product.findMany({
+          where: { id: { in: productIds } },
+          select: {
+            id: true,
+            name: true,
+            sku: true,
+            images: true,
+            landedCost: true,
+          },
+        })
+      : [];
 
-    for (const item of allItems) {
-      const productId = item.product.id;
-      const existing = productStats.get(productId);
+    // Get last sale date per product
+    const lastSaleDates = productIds.length > 0
+      ? await prisma.orderItem.findMany({
+          where: {
+            productId: { in: productIds },
+            order: { status: { not: "cancelled" } },
+          },
+          distinct: ["productId"],
+          orderBy: { order: { createdAt: "desc" } },
+          select: {
+            productId: true,
+            order: { select: { createdAt: true } },
+          },
+        })
+      : [];
 
-      const quantity = item.quantity;
-      const revenue = Number(item.totalPrice);
-      const landedCost = item.product.landedCost ? Number(item.product.landedCost) : 0;
-      const cogs = landedCost * quantity;
-      const isRecent = item.order.createdAt >= thirtyDaysAgo;
+    const productMap = new Map(products.map((p) => [p.id, p]));
+    const recentMap = new Map(recentStats.map((s) => [s.productId, Number(s._sum.totalPrice || 0)]));
+    const lastSaleMap = new Map(lastSaleDates.map((s) => [s.productId, s.order.createdAt]));
 
-      if (existing) {
-        existing.unitsSold += quantity;
-        existing.revenue += revenue;
-        existing.cogs += cogs;
-        if (isRecent) {
-          existing.revenue30Days += revenue;
-        }
-        if (!existing.lastSaleDate || item.order.createdAt > existing.lastSaleDate) {
-          existing.lastSaleDate = item.order.createdAt;
-        }
-      } else {
-        productStats.set(productId, {
-          productName: item.product.name,
-          productSku: item.product.sku,
-          productImage: item.product.images[0] || null,
-          unitsSold: quantity,
-          revenue,
-          cogs,
-          revenue30Days: isRecent ? revenue : 0,
-          lastSaleDate: item.order.createdAt,
-        });
-      }
-    }
+    // Build results from DB aggregations
+    const productsArray = allTimeStats.map((stat) => {
+      const product = productMap.get(stat.productId);
+      const unitsSold = stat._sum.quantity || 0;
+      const revenue = Number(stat._sum.totalPrice || 0);
+      const landedCost = product?.landedCost ? Number(product.landedCost) : 0;
+      const cogs = landedCost * unitsSold;
 
-    // Convert to array and calculate profit
-    const productsArray = Array.from(productStats.entries()).map(([productId, data]) => ({
-      productId,
-      productName: data.productName,
-      productSku: data.productSku,
-      productImage: data.productImage,
-      unitsSold: data.unitsSold,
-      revenue: data.revenue,
-      profit: data.revenue - data.cogs,
-      avgPrice: data.unitsSold > 0 ? data.revenue / data.unitsSold : 0,
-    }));
+      return {
+        productId: stat.productId,
+        productName: product?.name || "Unknown",
+        productSku: product?.sku || "",
+        productImage: product?.images[0] || null,
+        unitsSold,
+        revenue,
+        profit: revenue - cogs,
+        avgPrice: unitsSold > 0 ? revenue / unitsSold : 0,
+      };
+    });
 
     // Best sellers (by units sold)
     const bestSellers = [...productsArray]
@@ -337,17 +336,14 @@ export async function getProductPerformance(
 
     // Slow movers: products with stock but low recent sales
     const slowMovers = allProductsWithStock
-      .map((product) => {
-        const stats = productStats.get(product.id);
-        return {
-          productId: product.id,
-          productName: product.name,
-          productSku: product.sku,
-          stockLevel: product.currentStock,
-          lastSaleDate: stats?.lastSaleDate || null,
-          revenue30Days: stats?.revenue30Days || 0,
-        };
-      })
+      .map((product) => ({
+        productId: product.id,
+        productName: product.name,
+        productSku: product.sku,
+        stockLevel: product.currentStock,
+        lastSaleDate: lastSaleMap.get(product.id) || null,
+        revenue30Days: recentMap.get(product.id) || 0,
+      }))
       .filter((p) => p.revenue30Days < 100)
       .sort((a, b) => b.stockLevel - a.stockLevel)
       .slice(0, limit);
@@ -365,12 +361,16 @@ export async function getProductPerformance(
     console.error("Error fetching product performance:", error);
     return { success: false, error: "Failed to fetch product performance" };
   }
-}
+  },
+  ["product-performance"],
+  { revalidate: 60, tags: ["analytics", "orders", "products"] }
+);
 
 /**
  * Get supplier performance
  */
-export async function getSupplierPerformance(): Promise<AnalyticsActionResult<Array<{
+export const getSupplierPerformance = unstable_cache(
+  async (): Promise<AnalyticsActionResult<Array<{
   supplierId: string;
   supplierName: string;
   totalSpent: number;
@@ -378,7 +378,7 @@ export async function getSupplierPerformance(): Promise<AnalyticsActionResult<Ar
   productsCount: number;
   ordersCount: number;
   avgProductCost: number;
-}>>> {
+}>>> => {
   try {
     // Fetch lightweight supplier data and revenue separately to avoid loading all orderItems
     const [suppliers, revenueBySupplier] = await Promise.all([
@@ -455,15 +455,19 @@ export async function getSupplierPerformance(): Promise<AnalyticsActionResult<Ar
     console.error("Error fetching supplier performance:", error);
     return { success: false, error: "Failed to fetch supplier performance" };
   }
-}
+  },
+  ["supplier-performance"],
+  { revalidate: 60, tags: ["analytics", "suppliers", "purchase-orders"] }
+);
 
 /**
  * Get revenue by period for charts
  */
-export async function getRevenueByPeriod(
+export const getRevenueByPeriod = unstable_cache(
+  async (
   period: "day" | "week" | "month",
   dateRange?: { start: Date; end: Date }
-): Promise<AnalyticsActionResult<Array<{ date: string; revenue: number; orders: number }>>> {
+): Promise<AnalyticsActionResult<Array<{ date: string; revenue: number; orders: number }>>> => {
   try {
     const now = new Date();
     let startDate: Date;
@@ -554,10 +558,13 @@ export async function getRevenueByPeriod(
     console.error("Error fetching revenue by period:", error);
     return { success: false, error: "Failed to fetch revenue by period" };
   }
-}
+  },
+  ["revenue-by-period"],
+  { revalidate: 60, tags: ["analytics", "orders"] }
+);
 
 /**
- * Get sales by order type
+ * Get sales by order type - uses groupBy for efficiency
  */
 export async function getSalesByType(
   dateRange?: { start: Date; end: Date }
@@ -578,58 +585,45 @@ export async function getSalesByType(
       };
     }
 
-    const orders = await prisma.order.findMany({
+    // Use groupBy instead of fetching all orders
+    const result = await prisma.order.groupBy({
+      by: ["type"],
       where,
-      select: {
-        type: true as any,
-        total: true,
-      },
+      _sum: { total: true },
+      _count: true,
     });
 
-    let onlineRevenue = 0;
-    let onlineCount = 0;
-    let wholesaleRevenue = 0;
-    let wholesaleCount = 0;
-    let retailRevenue = 0;
-    let retailCount = 0;
+    const typeMap: Record<string, { revenue: number; count: number }> = {
+      online: { revenue: 0, count: 0 },
+      wholesale: { revenue: 0, count: 0 },
+      retail: { revenue: 0, count: 0 },
+    };
 
-    for (const order of orders) {
-      const total = Number(order.total);
-      switch (order.type) {
-        case "online":
-          onlineRevenue += total;
-          onlineCount++;
-          break;
-        case "wholesale":
-          wholesaleRevenue += total;
-          wholesaleCount++;
-          break;
-        case "retail":
-          retailRevenue += total;
-          retailCount++;
-          break;
+    for (const row of result) {
+      if (typeMap[row.type]) {
+        typeMap[row.type] = {
+          revenue: Number(row._sum.total || 0),
+          count: row._count,
+        };
       }
     }
 
-    const totalRevenue = onlineRevenue + wholesaleRevenue + retailRevenue;
+    const totalRevenue = typeMap.online.revenue + typeMap.wholesale.revenue + typeMap.retail.revenue;
 
     return {
       success: true,
       data: {
         online: {
-          revenue: onlineRevenue,
-          count: onlineCount,
-          percentage: totalRevenue > 0 ? (onlineRevenue / totalRevenue) * 100 : 0,
+          ...typeMap.online,
+          percentage: totalRevenue > 0 ? (typeMap.online.revenue / totalRevenue) * 100 : 0,
         },
         wholesale: {
-          revenue: wholesaleRevenue,
-          count: wholesaleCount,
-          percentage: totalRevenue > 0 ? (wholesaleRevenue / totalRevenue) * 100 : 0,
+          ...typeMap.wholesale,
+          percentage: totalRevenue > 0 ? (typeMap.wholesale.revenue / totalRevenue) * 100 : 0,
         },
         retail: {
-          revenue: retailRevenue,
-          count: retailCount,
-          percentage: totalRevenue > 0 ? (retailRevenue / totalRevenue) * 100 : 0,
+          ...typeMap.retail,
+          percentage: totalRevenue > 0 ? (typeMap.retail.revenue / totalRevenue) * 100 : 0,
         },
       },
     };
@@ -705,7 +699,8 @@ export async function getOrdersExportData(
 /**
  * Get complete analytics overview
  */
-export async function getAnalyticsOverview(
+export const getAnalyticsOverview = unstable_cache(
+  async (
   period: "1d" | "7d" | "30d" | "90d" | "thisYear" | "allTime" = "30d"
 ): Promise<AnalyticsActionResult<{
   revenue: {
@@ -726,7 +721,7 @@ export async function getAnalyticsOverview(
   };
   inventoryValue: number;
   lowStockCount: number;
-}>> {
+}>> => {
   try {
     // Calculate date range
     const now = new Date();
@@ -900,4 +895,7 @@ export async function getAnalyticsOverview(
     console.error("Error fetching analytics overview:", error);
     return { success: false, error: "Failed to fetch analytics overview" };
   }
-}
+  },
+  ["analytics-overview"],
+  { revalidate: 60, tags: ["analytics", "orders", "inventory"] }
+);

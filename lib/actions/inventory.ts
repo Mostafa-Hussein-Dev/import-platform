@@ -1,7 +1,7 @@
 "use server";
 
 import { prisma } from "@/lib";
-import { revalidatePath } from "next/cache";
+import { revalidatePath, revalidateTag, unstable_cache } from "next/cache";
 import { createBulkStockMovements } from "./stock-movements";
 import { Prisma } from "@prisma/client";
 
@@ -141,72 +141,54 @@ export async function getInventoryValue(): Promise<InventoryActionResult<{
   }>;
 }>> {
   try {
-    // Get all products with stock
-    const products = await prisma.product.findMany({
-      where: {
-        status: "ACTIVE",
-        currentStock: { gt: 0 },
-        landedCost: { not: null },
-      },
-      select: {
-        id: true,
-        name: true,
-        category: true,
-        currentStock: true,
-        landedCost: true,
-        supplierId: true,
-        supplier: {
-          select: {
-            id: true,
-            companyName: true,
-          },
-        },
-      },
-    });
-
-    // Calculate total value and breakdown by category
-    const categoryBreakdown: Record<string, { value: number; count: number }> = {};
-    const supplierBreakdown: Record<string, { value: number; count: number; name: string }> = {};
-    let totalValue = 0;
-
-    products.forEach((product) => {
-      const value = Number(product.landedCost!) * product.currentStock;
-      totalValue += value;
-
+    // Use raw SQL for efficient aggregation (SUM of computed field)
+    const [totalResult, categoryResult, supplierResult] = await Promise.all([
+      // Total inventory value
+      prisma.$queryRaw<[{ total: number }]>`
+        SELECT COALESCE(SUM("landedCost" * "currentStock"), 0)::float as total
+        FROM products
+        WHERE status = 'ACTIVE' AND "landedCost" IS NOT NULL AND "currentStock" > 0
+      `,
       // Category breakdown
-      const category = product.category || "Uncategorized";
-      if (!categoryBreakdown[category]) {
-        categoryBreakdown[category] = { value: 0, count: 0 };
-      }
-      categoryBreakdown[category].value += value;
-      categoryBreakdown[category].count += 1;
-
+      prisma.$queryRaw<Array<{ category: string | null; value: number; count: number }>>`
+        SELECT
+          COALESCE(category, 'Uncategorized') as category,
+          SUM("landedCost" * "currentStock")::float as value,
+          COUNT(*)::int as count
+        FROM products
+        WHERE status = 'ACTIVE' AND "landedCost" IS NOT NULL AND "currentStock" > 0
+        GROUP BY category
+        ORDER BY value DESC
+      `,
       // Supplier breakdown
-      if (!supplierBreakdown[product.supplierId]) {
-        supplierBreakdown[product.supplierId] = {
-          value: 0,
-          count: 0,
-          name: product.supplier.companyName,
-        };
-      }
-      supplierBreakdown[product.supplierId].value += value;
-      supplierBreakdown[product.supplierId].count += 1;
-    });
+      prisma.$queryRaw<Array<{ "supplierId": string; "supplierName": string; value: number; count: number }>>`
+        SELECT
+          p."supplierId",
+          s."companyName" as "supplierName",
+          SUM(p."landedCost" * p."currentStock")::float as value,
+          COUNT(*)::int as count
+        FROM products p
+        JOIN suppliers s ON p."supplierId" = s.id
+        WHERE p.status = 'ACTIVE' AND p."landedCost" IS NOT NULL AND p."currentStock" > 0
+        GROUP BY p."supplierId", s."companyName"
+        ORDER BY value DESC
+      `,
+    ]);
 
     return {
       success: true,
       data: {
-        totalValue,
-        breakdown: Object.entries(categoryBreakdown).map(([category, data]) => ({
-          category,
-          value: data.value,
-          count: data.count,
+        totalValue: totalResult[0]?.total || 0,
+        breakdown: categoryResult.map((row) => ({
+          category: row.category,
+          value: row.value,
+          count: row.count,
         })),
-        supplierBreakdown: Object.entries(supplierBreakdown).map(([supplierId, data]) => ({
-          supplierId,
-          supplierName: data.name,
-          value: data.value,
-          count: data.count,
+        supplierBreakdown: supplierResult.map((row) => ({
+          supplierId: row.supplierId,
+          supplierName: row.supplierName,
+          value: row.value,
+          count: row.count,
         })),
       },
     };
@@ -351,6 +333,8 @@ export async function processShipmentDelivery(
     );
 
     // Revalidate paths
+    revalidateTag("inventory", {});
+    revalidateTag("dashboard", {});
     revalidatePath("/dashboard/inventory");
     revalidatePath("/dashboard/shipments");
     revalidatePath("/dashboard/purchase-orders");
@@ -471,70 +455,74 @@ function calculateLandedCosts(
 /**
  * Get inventory stats for dashboard
  */
-export async function getInventoryStats(): Promise<InventoryActionResult<{
-  totalProducts: number;
-  totalInventoryValue: number;
-  lowStockCount: number;
-  outOfStockCount: number;
-  totalStockUnits: number;
-}>> {
-  try {
-    const [totalProducts, inventoryValue, lowStock, outOfStock] = await Promise.all([
-      prisma.product.count({ where: { status: "ACTIVE" } }),
-      (async () => {
-        const products = await prisma.product.findMany({
+export const getInventoryStats = unstable_cache(
+  async (): Promise<InventoryActionResult<{
+    totalProducts: number;
+    totalInventoryValue: number;
+    lowStockCount: number;
+    outOfStockCount: number;
+    totalStockUnits: number;
+  }>> => {
+    try {
+      const [totalProducts, inventoryValue, lowStock, outOfStock] = await Promise.all([
+        prisma.product.count({ where: { status: "ACTIVE" } }),
+        (async () => {
+          const products = await prisma.product.findMany({
+            where: {
+              status: "ACTIVE",
+              landedCost: { not: null },
+            },
+            select: {
+              currentStock: true,
+              landedCost: true,
+            },
+          });
+
+          return products.reduce(
+            (sum, p) => sum + Number(p.landedCost!) * p.currentStock,
+            0
+          );
+        })(),
+        prisma.product.count({
           where: {
             status: "ACTIVE",
-            landedCost: { not: null },
+            currentStock: {
+              gt: 0,
+              lte: prisma.product.fields.reorderLevel,
+            },
           },
-          select: {
-            currentStock: true,
-            landedCost: true,
+        }),
+        prisma.product.count({
+          where: {
+            status: "ACTIVE",
+            currentStock: 0,
           },
-        });
+        }),
+      ]);
 
-        return products.reduce(
-          (sum, p) => sum + Number(p.landedCost!) * p.currentStock,
-          0
-        );
-      })(),
-      prisma.product.count({
-        where: {
-          status: "ACTIVE",
-          currentStock: {
-            gt: 0,
-            lte: prisma.product.fields.reorderLevel,
-          },
+      const totalStockUnits = await prisma.product.aggregate({
+        where: { status: "ACTIVE" },
+        _sum: { currentStock: true },
+      });
+
+      return {
+        success: true,
+        data: {
+          totalProducts,
+          totalInventoryValue: Math.round(inventoryValue * 100) / 100,
+          lowStockCount: lowStock,
+          outOfStockCount: outOfStock,
+          totalStockUnits: totalStockUnits._sum.currentStock || 0,
         },
-      }),
-      prisma.product.count({
-        where: {
-          status: "ACTIVE",
-          currentStock: 0,
-        },
-      }),
-    ]);
-
-    const totalStockUnits = await prisma.product.aggregate({
-      where: { status: "ACTIVE" },
-      _sum: { currentStock: true },
-    });
-
-    return {
-      success: true,
-      data: {
-        totalProducts,
-        totalInventoryValue: Math.round(inventoryValue * 100) / 100,
-        lowStockCount: lowStock,
-        outOfStockCount: outOfStock,
-        totalStockUnits: totalStockUnits._sum.currentStock || 0,
-      },
-    };
-  } catch (error) {
-    console.error("Error fetching inventory stats:", error);
-    return { success: false, error: "Failed to fetch inventory stats" };
-  }
-}
+      };
+    } catch (error) {
+      console.error("Error fetching inventory stats:", error);
+      return { success: false, error: "Failed to fetch inventory stats" };
+    }
+  },
+  ["inventory-stats"],
+  { revalidate: 30, tags: ["inventory", "products"] }
+);
 
 /**
  * Get stock movement trend data for charts

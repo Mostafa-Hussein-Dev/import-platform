@@ -34,7 +34,12 @@
       "Bash(xargs sed:*)",
       "Bash(pnpm build:*)",
       "Bash(ls:*)",
-      "Bash(npx tsc:*)"
+      "Bash(npx tsc:*)",
+      "Bash(cd:*)",
+      "Bash(wc:*)",
+      "Bash(npx prisma db execute:*)",
+      "Bash(npx tsx:*)",
+      "Bash(DATABASE_URL=\"postgresql://postgres.zxfpltgpnccbkxzwjkbw:w5dlrOUecXUCJgWh@aws-1-ap-southeast-1.pooler.supabase.com:6543/postgres?pgbouncer=true\" DIRECT_URL=\"postgresql://postgres.zxfpltgpnccbkxzwjkbw:w5dlrOUecXUCJgWh@aws-1-ap-southeast-1.pooler.supabase.com:5432/postgres\" npx prisma db push --skip-generate)"
     ]
   }
 }

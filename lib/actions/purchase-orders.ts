@@ -2,7 +2,7 @@
 
 import { prisma } from "@/lib/prisma";
 import { getServerSession, requireValidUser } from "@/lib/auth";
-import { revalidatePath } from "next/cache";
+import { revalidatePath, revalidateTag, unstable_cache } from "next/cache";
 import { purchaseOrderFormSchema, purchaseOrderFilterSchema, updatePurchaseOrderStatusSchema, recordPaymentSchema } from "@/lib/validations/purchase-order";
 import type { PurchaseOrderFormData, PurchaseOrderFilterData, RecordPaymentData } from "@/lib/validations/purchase-order";
 import type { Prisma } from "@prisma/client";
@@ -282,6 +282,8 @@ export async function createPurchaseOrder(data: PurchaseOrderFormData): Promise<
       },
     });
 
+    revalidateTag("purchase-orders", {});
+    revalidateTag("dashboard", {});
     revalidatePath("/dashboard/purchase-orders");
 
     return { success: true, data: { id: po.id, poNumber: po.poNumber } };
@@ -365,6 +367,8 @@ export async function updatePurchaseOrder(
       });
     }
 
+    revalidateTag("purchase-orders", {});
+    revalidateTag("dashboard", {});
     revalidatePath("/dashboard/purchase-orders");
     revalidatePath(`/dashboard/purchase-orders/${id}`);
 
@@ -398,6 +402,8 @@ export async function deletePurchaseOrder(id: string): Promise<PurchaseOrderActi
       where: { id },
     });
 
+    revalidateTag("purchase-orders", {});
+    revalidateTag("dashboard", {});
     revalidatePath("/dashboard/purchase-orders");
 
     return { success: true };
@@ -450,6 +456,8 @@ export async function updatePurchaseOrderStatus(
       data: { status },
     });
 
+    revalidateTag("purchase-orders", {});
+    revalidateTag("dashboard", {});
     revalidatePath("/dashboard/purchase-orders");
     revalidatePath(`/dashboard/purchase-orders/${id}`);
 
@@ -501,6 +509,8 @@ export async function recordPayment(
       },
     });
 
+    revalidateTag("purchase-orders", {});
+    revalidateTag("dashboard", {});
     revalidatePath("/dashboard/purchase-orders");
     revalidatePath(`/dashboard/purchase-orders/${id}`);
 
@@ -511,71 +521,83 @@ export async function recordPayment(
   }
 }
 
-export async function getPurchaseOrderCount(filters?: { status?: string }): Promise<PurchaseOrderActionResult<number>> {
-  try {
-    const where: any = {};
-    if (filters?.status) {
-      where.status = filters.status;
+export const getPurchaseOrderCount = unstable_cache(
+  async (filters?: { status?: string }): Promise<PurchaseOrderActionResult<number>> => {
+    try {
+      const where: any = {};
+      if (filters?.status) {
+        where.status = filters.status;
+      }
+
+      const count = await prisma.purchaseOrder.count({ where });
+      return { success: true, data: count };
+    } catch (error) {
+      console.error("Error getting purchase order count:", error);
+      return { success: false, error: "Failed to get purchase order count" };
     }
+  },
+  ["purchase-order-count"],
+  { revalidate: 30, tags: ["purchase-orders"] }
+);
 
-    const count = await prisma.purchaseOrder.count({ where });
-    return { success: true, data: count };
-  } catch (error) {
-    console.error("Error getting purchase order count:", error);
-    return { success: false, error: "Failed to get purchase order count" };
-  }
-}
+export const getRecentPurchaseOrders = unstable_cache(
+  async (limit: number = 5): Promise<PurchaseOrderActionResult<Array<{
+    id: string;
+    poNumber: string;
+    supplier: { companyName: string };
+    orderDate: Date;
+    totalCost: number;
+    status: string;
+  }>>> => {
+    try {
+      const orders = await prisma.purchaseOrder.findMany({
+        take: limit,
+        orderBy: { orderDate: "desc" },
+        include: {
+          supplier: { select: { companyName: true } },
+        },
+      });
 
-export async function getRecentPurchaseOrders(limit: number = 5): Promise<PurchaseOrderActionResult<Array<{
-  id: string;
-  poNumber: string;
-  supplier: { companyName: string };
-  orderDate: Date;
-  totalCost: number;
-  status: string;
-}>>> {
-  try {
-    const orders = await prisma.purchaseOrder.findMany({
-      take: limit,
-      orderBy: { orderDate: "desc" },
-      include: {
-        supplier: { select: { companyName: true } },
-      },
-    });
+      const data = orders.map(order => ({
+        id: order.id,
+        poNumber: order.poNumber,
+        supplier: { companyName: order.supplier.companyName },
+        orderDate: order.orderDate,
+        totalCost: Number(order.totalCost),
+        status: order.status,
+      }));
 
-    const data = orders.map(order => ({
-      id: order.id,
-      poNumber: order.poNumber,
-      supplier: { companyName: order.supplier.companyName },
-      orderDate: order.orderDate,
-      totalCost: Number(order.totalCost),
-      status: order.status,
-    }));
-
-    return { success: true, data };
-  } catch (error) {
-    console.error("Error getting recent purchase orders:", error);
-    return { success: false, error: "Failed to get recent purchase orders" };
-  }
-}
-
-export async function getTotalPurchaseOrderValue(filters?: { dateFrom?: Date; dateTo?: Date }): Promise<PurchaseOrderActionResult<number>> {
-  try {
-    const where: any = {};
-    if (filters?.dateFrom || filters?.dateTo) {
-      where.orderDate = {};
-      if (filters.dateFrom) where.orderDate.gte = filters.dateFrom;
-      if (filters.dateTo) where.orderDate.lte = filters.dateTo;
+      return { success: true, data };
+    } catch (error) {
+      console.error("Error getting recent purchase orders:", error);
+      return { success: false, error: "Failed to get recent purchase orders" };
     }
+  },
+  ["recent-purchase-orders"],
+  { revalidate: 30, tags: ["purchase-orders"] }
+);
 
-    const result = await prisma.purchaseOrder.aggregate({
-      where,
-      _sum: { totalCost: true },
-    });
+export const getTotalPurchaseOrderValue = unstable_cache(
+  async (filters?: { dateFrom?: Date; dateTo?: Date }): Promise<PurchaseOrderActionResult<number>> => {
+    try {
+      const where: any = {};
+      if (filters?.dateFrom || filters?.dateTo) {
+        where.orderDate = {};
+        if (filters.dateFrom) where.orderDate.gte = filters.dateFrom;
+        if (filters.dateTo) where.orderDate.lte = filters.dateTo;
+      }
 
-    return { success: true, data: Number(result._sum.totalCost || 0) };
-  } catch (error) {
-    console.error("Error getting total PO value:", error);
-    return { success: false, error: "Failed to get total PO value" };
-  }
-}
+      const result = await prisma.purchaseOrder.aggregate({
+        where,
+        _sum: { totalCost: true },
+      });
+
+      return { success: true, data: Number(result._sum.totalCost || 0) };
+    } catch (error) {
+      console.error("Error getting total PO value:", error);
+      return { success: false, error: "Failed to get total PO value" };
+    }
+  },
+  ["total-purchase-order-value"],
+  { revalidate: 30, tags: ["purchase-orders"] }
+);

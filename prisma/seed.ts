@@ -722,7 +722,7 @@ async function seedProducts(suppliers: any[]) {
 // ============================================
 // 4. POTENTIAL PRODUCTS
 // ============================================
-async function seedPotentialProducts(suppliers: any[]) {
+async function seedPotentialProducts(suppliers: any[], users: any[]) {
   log("\n=== Seeding Potential Products ===", "cyan");
 
   // Check if potential products already exist
@@ -755,6 +755,7 @@ async function seedPotentialProducts(suppliers: any[]) {
       ],
       notes: "Competitive pricing, excellent reviews on supplier platform. RGB lighting is customizable via software. Need to verify battery life claims.",
       status: "RESEARCHING",
+      createdBy: users[0].id,
     },
     {
       name: "Luxury Throw Pillow - Embroidered Floral",
@@ -774,6 +775,7 @@ async function seedPotentialProducts(suppliers: any[]) {
       ],
       notes: "Sample received - quality approved. Colors are accurate to photos. Embroidery quality is excellent. Ready to place first order.",
       status: "APPROVED",
+      createdBy: users[0].id,
     },
     {
       name: "Plastic Organizer Bins - Set of 3",
@@ -792,6 +794,7 @@ async function seedPotentialProducts(suppliers: any[]) {
       ],
       notes: "Sample quality was poor - plastic was too thin and frames broke easily. Supplier not willing to improve quality at this price point.",
       status: "REJECTED",
+      createdBy: users[0].id,
     },
   ];
 
@@ -1209,7 +1212,7 @@ async function main() {
     const users = await seedUsers();
     const suppliers = await seedSuppliers(users);
     const products = await seedProducts(suppliers);
-    const potentialProducts = await seedPotentialProducts(suppliers);
+    const potentialProducts = await seedPotentialProducts(suppliers, users);
     const shippingCompanies = await seedShippingCompanies();
     const purchaseOrders = await seedPurchaseOrders(suppliers, products);
     const shipments = await seedShipmentsAndStockMovements(purchaseOrders, shippingCompanies, products);

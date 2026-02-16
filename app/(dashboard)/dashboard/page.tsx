@@ -1,16 +1,5 @@
 import { Suspense } from "react";
-import { getSupplierCount, getRecentSuppliers } from "@/lib/actions/suppliers";
-import { getProductCount, getActiveProductCount, getLowStockProductCount, getRecentProducts } from "@/lib/actions/products";
-import { getPotentialProductsCount, getApprovedPotentialProducts } from "@/lib/actions/potential-products";
-import {
-  getPurchaseOrderCount,
-  getRecentPurchaseOrders,
-  getTotalPurchaseOrderValue,
-} from "@/lib/actions/purchase-orders";
-import { getShipmentCount, getRecentShipments } from "@/lib/actions/shipments";
-import { getInventoryStats } from "@/lib/actions/inventory";
-import { getRecentStockMovements } from "@/lib/actions/stock-movements";
-import { getOrderStats, getRecentOrders } from "@/lib/actions/orders";
+import { getDashboardData } from "@/lib/actions/dashboard";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -24,64 +13,16 @@ import { RecentMovementsWidget } from "@/components/dashboard/recent-movements-w
 export const dynamic = 'force-dynamic';
 
 export default async function DashboardPage() {
-  const [
-    suppliersResult,
-    productsResult,
-    activeProductsResult,
-    lowStockResult,
-    recentSuppliersResult,
-    recentProductsResult,
-    potentialProductsCountResult,
-    approvedPotentialProductsResult,
-    sentPOResult,
-    confirmedPOResult,
-    inTransitShipmentsResult,
-    customsShipmentsResult,
-    recentPOsResult,
-    recentShipmentsResult,
-    thisMonthPOValueResult,
-    inventoryStatsResult,
-    recentMovementsResult,
-    orderStatsResult,
-    recentOrdersResult,
-  ] = await Promise.all([
-    getSupplierCount(),
-    getProductCount(),
-    getActiveProductCount(),
-    getLowStockProductCount(),
-    getRecentSuppliers(5),
-    getRecentProducts(5),
-    getPotentialProductsCount(),
-    getApprovedPotentialProducts(5),
-    getPurchaseOrderCount({ status: "sent" }),
-    getPurchaseOrderCount({ status: "confirmed" }),
-    getShipmentCount({ status: "in_transit" }),
-    getShipmentCount({ status: "customs" }),
-    getRecentPurchaseOrders(5),
-    getRecentShipments(5),
-    getTotalPurchaseOrderValue({
-      dateFrom: new Date(new Date().getFullYear(), new Date().getMonth(), 1),
-    }),
-    getInventoryStats(),
-    getRecentStockMovements(5),
-    getOrderStats(),
-    getRecentOrders(5),
-  ]);
+  const data = await getDashboardData();
 
-  const potentialProductsCount = potentialProductsCountResult.success ? potentialProductsCountResult.data : null;
-
-  const activePOs = (sentPOResult.success ? sentPOResult.data || 0 : 0) +
-    (confirmedPOResult.success ? confirmedPOResult.data || 0 : 0);
-  const inTransitShipments = inTransitShipmentsResult.success ? inTransitShipmentsResult.data || 0 : 0;
-  const atCustomsShipments = customsShipmentsResult.success ? customsShipmentsResult.data || 0 : 0;
-  const thisMonthPOValue = thisMonthPOValueResult.success ? thisMonthPOValueResult.data || 0 : 0;
-
-  const inventoryValue = inventoryStatsResult.success ? inventoryStatsResult.data?.totalInventoryValue ?? 0 : 0;
-
-  const recentMovements = recentMovementsResult.success ? recentMovementsResult.data ?? [] : [];
-
-  const orderStats = orderStatsResult.success ? orderStatsResult.data : null;
-  const recentOrders = recentOrdersResult.success ? recentOrdersResult.data ?? [] : [];
+  const activePOs = data.counts.sentPOs + data.counts.confirmedPOs;
+  const inTransitShipments = data.counts.inTransitShipments;
+  const atCustomsShipments = data.counts.customsShipments;
+  const thisMonthPOValue = data.values.thisMonthPOValue;
+  const inventoryValue = data.values.inventoryValue;
+  const recentMovements = data.recentMovements;
+  const orderStats = data.orderStats;
+  const recentOrders = data.recentOrders;
 
   const stats = [
     {
@@ -180,9 +121,9 @@ export default async function DashboardPage() {
             </Link>
           </CardHeader>
           <CardContent>
-            {recentPOsResult.success && recentPOsResult.data && recentPOsResult.data.length > 0 ? (
+            {data.recentPOs.length > 0 ? (
               <div className="space-y-4">
-                {recentPOsResult.data.map((po) => (
+                {data.recentPOs.map((po) => (
                   <div
                     key={po.id}
                     className="flex items-center justify-between"
@@ -224,9 +165,9 @@ export default async function DashboardPage() {
             </Link>
           </CardHeader>
           <CardContent>
-            {recentShipmentsResult.success && recentShipmentsResult.data && recentShipmentsResult.data.length > 0 ? (
+            {data.recentShipments.length > 0 ? (
               <div className="space-y-4">
-                {recentShipmentsResult.data.map((shipment) => (
+                {data.recentShipments.map((shipment) => (
                   <div
                     key={shipment.id}
                     className="flex items-center justify-between"
@@ -263,9 +204,9 @@ export default async function DashboardPage() {
             </Link>
           </CardHeader>
           <CardContent>
-            {approvedPotentialProductsResult.success && approvedPotentialProductsResult.data && approvedPotentialProductsResult.data.length > 0 ? (
+            {data.approvedPotentialProducts.length > 0 ? (
               <div className="space-y-4">
-                {approvedPotentialProductsResult.data.map((product) => (
+                {data.approvedPotentialProducts.map((product) => (
                   <div
                     key={product.id}
                     className="flex items-center justify-between"
@@ -301,7 +242,7 @@ export default async function DashboardPage() {
           </CardContent>
         </Card>
 
-        {/* Recent Orders - NEW */}
+        {/* Recent Orders */}
         <Card>
           <CardHeader className="flex flex-row items-center justify-between">
             <CardTitle>Recent Orders</CardTitle>
@@ -345,7 +286,7 @@ export default async function DashboardPage() {
         </Card>
       </div>
 
-      {/* Sales Stats Section - NEW */}
+      {/* Sales Stats Section */}
       {orderStats && (
         <div>
           <h2 className="text-xl font-bold tracking-tight mb-4">Sales Overview (This Month)</h2>
