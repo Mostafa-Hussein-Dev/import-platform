@@ -46,7 +46,7 @@ async function seedUsers() {
   const users = await Promise.all([
     prisma.user.create({
       data: {
-        email: "admin@import-platform.com",
+        email: "admin@spilot.com",
         name: "Admin User",
         password: passwordHash,
         image: "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=200&h=200&fit=crop",
@@ -54,7 +54,7 @@ async function seedUsers() {
     }),
     prisma.user.create({
       data: {
-        email: "manager@import-platform.com",
+        email: "manager@spilot.com",
         name: "Manager User",
         password: passwordHash,
         image: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=200&h=200&fit=crop",
@@ -1228,7 +1228,7 @@ async function main() {
     log(`  Shipments: ${shipments.length}`, "blue");
 
     log("\nTest credentials:", "yellow");
-    log(`  Email: admin@import-platform.com`, "yellow");
+    log(`  Email: admin@spilot.com`, "yellow");
     log(`  Password: password123`, "yellow");
 
   } catch (error) {

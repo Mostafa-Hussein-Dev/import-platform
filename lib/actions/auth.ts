@@ -4,6 +4,7 @@ import { signIn } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import bcrypt from "bcryptjs";
 import { redirect } from "next/navigation";
+import { isRedirectError } from "next/dist/client/components/redirect-error";
 import { z } from "zod";
 
 const signInSchema = z.object({
@@ -36,13 +37,16 @@ export async function signInAction(formData: SignInFormData) {
 
   const { email, password } = validatedFields.data;
 
-  const result = await signIn("credentials", {
-    email,
-    password,
-    redirect: false,
-  });
-
-  if (result?.error) {
+  try {
+    await signIn("credentials", {
+      email,
+      password,
+      redirect: false,
+    });
+  } catch (error: unknown) {
+    if (isRedirectError(error)) {
+      throw error;
+    }
     return {
       success: false,
       error: {
@@ -93,11 +97,19 @@ export async function signUpAction(formData: SignUpFormData) {
   });
 
   // Sign in the user
-  await signIn("credentials", {
-    email,
-    password,
-    redirect: false,
-  });
+  try {
+    await signIn("credentials", {
+      email,
+      password,
+      redirect: false,
+    });
+  } catch (error: unknown) {
+    if (isRedirectError(error)) {
+      throw error;
+    }
+    // User was created but auto-sign-in failed — redirect to sign-in page
+    redirect("/sign-in");
+  }
 
   redirect("/dashboard");
 }

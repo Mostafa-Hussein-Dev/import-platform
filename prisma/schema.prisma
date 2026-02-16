@@ -124,6 +124,7 @@ model Product {
   potentialProduct PotentialProduct?
   purchaseOrderItems PurchaseOrderItem[]
   stockMovements   StockMovement[]
+  orderItems       OrderItem[]
 
   @@index([supplierId])
   @@index([status])
@@ -349,4 +350,70 @@ model StockMovement {
   @@index([createdAt])
   @@index([referenceType, referenceId])
   @@map("stock_movements")
+}
+
+// Phase 5: Sales & Analytics
+
+model Order {
+  id              String      @id @default(cuid())
+  orderNumber     String      @unique  // ORD-2025-001 (auto-generated)
+
+  type            String      // "online", "wholesale", "retail"
+
+  // Customer information
+  customerName    String
+  customerPhone   String?
+  customerEmail   String?
+
+  // For wholesale customers
+  isWholesale     Boolean     @default(false)
+  companyName     String?
+
+  // Delivery
+  shippingAddress String?     @db.Text
+  city            String?
+
+  status          String      @default("pending") // pending, confirmed, packed, shipped, delivered, cancelled
+
+  // Payment tracking
+  paymentStatus   String      @default("pending") // pending, partial, paid
+
+  // Pricing
+  subtotal        Decimal     @db.Decimal(10, 2)
+  shippingFee     Decimal     @db.Decimal(10, 2) @default(0)
+  discount        Decimal?    @db.Decimal(10, 2) @default(0)
+  total           Decimal     @db.Decimal(10, 2)
+  paidAmount      Decimal     @db.Decimal(10, 2) @default(0)
+
+  items           OrderItem[]
+
+  notes           String?     @db.Text
+
+  createdBy       String?     // User ID from NextAuth
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+
+  @@index([type])
+  @@index([status])
+  @@index([paymentStatus])
+  @@index([createdAt])
+  @@index([customerName])
+  @@map("orders")
+}
+
+model OrderItem {
+  id              String   @id @default(cuid())
+  orderId         String
+  order           Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  productId       String
+  product         Product  @relation(fields: [productId], references: [id])
+
+  quantity        Int
+  unitPrice       Decimal  @db.Decimal(10, 2)  // Price at time of order
+  totalPrice      Decimal  @db.Decimal(10, 2)  // quantity × unitPrice
+
+  @@index([orderId])
+  @@index([productId])
+  @@map("order_items")
 }

@@ -14,8 +14,12 @@ const inter = localFont({
 });
 
 export const metadata: Metadata = {
-  title: "Import Platform - Wholesale Management",
-  description: "Import and wholesale e-commerce platform for managing products and suppliers",
+  title: "Stock Pilot - Wholesale Management",
+  description: "Stock Pilot — wholesale e-commerce platform for managing products and suppliers",
+  icons: {
+    icon: "/icon.png",
+    apple: "/apple-icon.png",
+  },
 };
 
 export default function RootLayout({
@@ -26,6 +30,9 @@ export default function RootLayout({
   return (
     <SessionProvider>
       <html lang="en">
+        <head>
+          <link rel="manifest" href="/site.webmanifest" />
+        </head>
         <body className={`${inter.variable} font-sans antialiased`}>
           {children}
         </body>

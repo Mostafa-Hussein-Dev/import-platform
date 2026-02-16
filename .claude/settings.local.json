@@ -33,7 +33,8 @@
       "Bash(npx next build:*)",
       "Bash(xargs sed:*)",
       "Bash(pnpm build:*)",
-      "Bash(ls:*)"
+      "Bash(ls:*)",
+      "Bash(npx tsc:*)"
     ]
   }
 }

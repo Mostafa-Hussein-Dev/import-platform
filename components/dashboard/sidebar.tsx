@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 import {
@@ -15,6 +16,8 @@ import {
   Building,
   X,
   Warehouse,
+  Receipt,
+  BarChart3,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useState } from "react";
@@ -46,6 +49,11 @@ const navItems = [
     icon: Warehouse,
   },
   {
+    title: "Orders",
+    href: "/dashboard/orders",
+    icon: Receipt,
+  },
+  {
     title: "Purchase Orders",
     href: "/dashboard/purchase-orders",
     icon: ShoppingCart,
@@ -59,6 +67,11 @@ const navItems = [
     title: "Shipping Companies",
     href: "/dashboard/shipping-companies",
     icon: Building,
+  },
+  {
+    title: "Analytics",
+    href: "/dashboard/analytics",
+    icon: BarChart3,
   },
   {
     title: "Settings",
@@ -103,12 +116,14 @@ export function Sidebar() {
       >
         <div className="flex flex-col h-full">
           {/* Logo */}
-          <div className="h-16 flex items-center px-5">
+          <div className="h-20 flex items-center px-5 mt-4">
             <div className="flex items-center gap-3">
-              <div className="h-9 w-9 rounded-lg bg-[#212861] flex items-center justify-center">
-                <Package className="h-5 w-5 text-white" />
-              </div>
-              <h1 className="text-lg font-bold text-[#212861]">Import Platform</h1>
+              <Image
+                src="/images/white.png"
+                alt="Stock Pilot"
+                width={200}
+                height={48}
+              />
             </div>
           </div>
 
@@ -142,7 +157,7 @@ export function Sidebar() {
           {/* Footer */}
           <div className="p-4 border-t border-[#F3F4F6]">
             <div className="text-xs text-[#9CA3AF] text-center">
-              &copy; 2026 Import Platform
+              &copy; 2026 Stock Pilot
             </div>
           </div>
         </div>

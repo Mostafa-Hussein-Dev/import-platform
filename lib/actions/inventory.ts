@@ -51,30 +51,27 @@ export async function getLowStockProducts(): Promise<InventoryActionResult<Array
             companyName: true,
           },
         },
-      },
-      orderBy: [{ currentStock: "asc" }],
-    });
-
-    // Get last order date for each product
-    const productsWithOrderDate = await Promise.all(
-      products.map(async (product) => {
-        const lastPO = await prisma.purchaseOrderItem.findFirst({
-          where: { productId: product.id },
-          include: {
+        purchaseOrderItems: {
+          select: {
             purchaseOrder: {
               select: { orderDate: true },
             },
           },
           orderBy: { purchaseOrder: { orderDate: "desc" } },
-        });
+          take: 1,
+        },
+      },
+      orderBy: [{ currentStock: "asc" }],
+    });
 
-        return {
-          ...product,
-          stockNeeded: product.reorderLevel - product.currentStock,
-          lastOrderDate: lastPO?.purchaseOrder.orderDate,
-        };
-      })
-    );
+    const productsWithOrderDate = products.map((product) => {
+      const { purchaseOrderItems, ...rest } = product;
+      return {
+        ...rest,
+        stockNeeded: product.reorderLevel - product.currentStock,
+        lastOrderDate: purchaseOrderItems[0]?.purchaseOrder.orderDate,
+      };
+    });
 
     return { success: true, data: productsWithOrderDate };
   } catch (error) {

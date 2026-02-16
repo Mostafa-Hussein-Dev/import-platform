@@ -5,6 +5,7 @@ import bcrypt from "bcryptjs";
 import type { NextAuthConfig } from "next-auth";
 import type { Session } from "next-auth";
 import { redirect } from "next/navigation";
+import { cache } from "react";
 
 export const authOptions: NextAuthConfig = {
   trustHost: true,
@@ -76,6 +77,16 @@ export const { handlers, auth, signIn, signOut } = NextAuth(authOptions);
 export const getServerSession = auth;
 
 /**
+ * Cached DB lookup for user by ID. Deduplicates within a single request.
+ */
+const getUserById = cache(async (userId: string) => {
+  return prisma.user.findUnique({
+    where: { id: userId },
+    select: { id: true, email: true, name: true },
+  });
+});
+
+/**
  * Verifies that the current session user exists in the database.
  * Returns null if user exists, or throws/redirects if invalid.
  * Use this in server actions to ensure session validity.
@@ -87,14 +98,9 @@ export async function requireValidUser(
     return null;
   }
 
-  const user = await prisma.user.findUnique({
-    where: { id: session.user.id },
-    select: { id: true, email: true, name: true },
-  });
+  const user = await getUserById(session.user.id);
 
   if (!user) {
-    // User from session doesn't exist in database
-    // This can happen if database was reset or user was deleted
     return null;
   }
 
@@ -112,13 +118,9 @@ export async function requireUserOrRedirect() {
     redirect("/sign-in");
   }
 
-  const user = await prisma.user.findUnique({
-    where: { id: session.user.id },
-    select: { id: true, email: true, name: true },
-  });
+  const user = await getUserById(session.user.id);
 
   if (!user) {
-    // Session exists but user doesn't - redirect to sign in with a message
     redirect("/sign-in?error=invalid_session");
   }
 
@@ -137,10 +139,6 @@ export async function isValidUserSession(
     return false;
   }
 
-  const user = await prisma.user.findUnique({
-    where: { id: session.user.id },
-    select: { id: true },
-  });
-
+  const user = await getUserById(session.user.id);
   return !!user;
 }

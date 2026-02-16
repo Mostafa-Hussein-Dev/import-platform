@@ -10,9 +10,11 @@ import {
 import { getShipmentCount, getRecentShipments } from "@/lib/actions/shipments";
 import { getInventoryStats } from "@/lib/actions/inventory";
 import { getRecentStockMovements } from "@/lib/actions/stock-movements";
+import { getOrderStats, getRecentOrders } from "@/lib/actions/orders";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Factory, Package, TrendingUp, AlertTriangle, Search, ShoppingCart, Truck, FileText, Warehouse } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Factory, Package, TrendingUp, AlertTriangle, Search, ShoppingCart, Truck, FileText, Warehouse, Receipt, DollarSign } from "lucide-react";
 import Link from "next/link";
 import { MarginDisplay } from "@/components/potential-products/margin-display";
 import { formatCurrency } from "@/lib/utils";
@@ -40,6 +42,8 @@ export default async function DashboardPage() {
     thisMonthPOValueResult,
     inventoryStatsResult,
     recentMovementsResult,
+    orderStatsResult,
+    recentOrdersResult,
   ] = await Promise.all([
     getSupplierCount(),
     getProductCount(),
@@ -60,6 +64,8 @@ export default async function DashboardPage() {
     }),
     getInventoryStats(),
     getRecentStockMovements(5),
+    getOrderStats(),
+    getRecentOrders(5),
   ]);
 
   const potentialProductsCount = potentialProductsCountResult.success ? potentialProductsCountResult.data : null;
@@ -73,6 +79,9 @@ export default async function DashboardPage() {
   const inventoryValue = inventoryStatsResult.success ? inventoryStatsResult.data?.totalInventoryValue ?? 0 : 0;
 
   const recentMovements = recentMovementsResult.success ? recentMovementsResult.data ?? [] : [];
+
+  const orderStats = orderStatsResult.success ? orderStatsResult.data : null;
+  const recentOrders = recentOrdersResult.success ? recentOrdersResult.data ?? [] : [];
 
   const stats = [
     {
@@ -120,8 +129,8 @@ export default async function DashboardPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-[2rem] font-bold tracking-tight">Welcome back!</h1>
-        <p className="text-[#6B7280] mt-1">Here's an overview of your import platform.</p>
+        <h1 className="text-2xl font-bold tracking-tight">Dashboard</h1>
+        <p className="text-[#6B7280] mt-1">Here's an overview of your platform.</p>
       </div>
 
       {/* Stats Cards */}
@@ -291,7 +300,97 @@ export default async function DashboardPage() {
             )}
           </CardContent>
         </Card>
+
+        {/* Recent Orders - NEW */}
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between">
+            <CardTitle>Recent Orders</CardTitle>
+            <Link
+              href="/dashboard/orders"
+              className="text-sm font-semibold text-[#3A9FE1] hover:text-[#2E8FD1] transition-colors"
+            >
+              View All
+            </Link>
+          </CardHeader>
+          <CardContent>
+            {recentOrders.length > 0 ? (
+              <div className="space-y-4">
+                {recentOrders.map((order) => (
+                  <Link
+                    key={order.id}
+                    href={`/dashboard/orders/${order.id}`}
+                    className="flex items-center justify-between hover:bg-muted/50 p-2 -mx-2 rounded-lg transition-colors"
+                  >
+                    <div>
+                      <p className="font-medium text-[#212861]">{order.orderNumber}</p>
+                      <p className="text-sm text-[#6B7280]">{order.customerName}</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-sm font-medium text-[#212861]">
+                        {formatCurrency(Number(order.total))}
+                      </p>
+                      <Badge variant="outline" className="text-xs">
+                        {order.status}
+                      </Badge>
+                    </div>
+                  </Link>
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm text-[#9CA3AF] text-center py-4">
+                No orders yet
+              </p>
+            )}
+          </CardContent>
+        </Card>
       </div>
+
+      {/* Sales Stats Section - NEW */}
+      {orderStats && (
+        <div>
+          <h2 className="text-xl font-bold tracking-tight mb-4">Sales Overview (This Month)</h2>
+          <div className="grid gap-5 md:grid-cols-3">
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <CardTitle className="text-sm font-medium text-muted-foreground">Orders This Month</CardTitle>
+                <div className="p-2 rounded-lg bg-[#E8F4FB]">
+                  <Receipt className="h-4 w-4 text-[#3A9FE1]" />
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{orderStats.monthOrders}</div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <CardTitle className="text-sm font-medium text-muted-foreground">Revenue This Month</CardTitle>
+                <div className="p-2 rounded-lg bg-[#D1FAE5]">
+                  <DollarSign className="h-4 w-4 text-[#10B981]" />
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{formatCurrency(orderStats.monthRevenue)}</div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <CardTitle className="text-sm font-medium text-muted-foreground">Pending Payments</CardTitle>
+                <div className="p-2 rounded-lg bg-[#FEF3C7]">
+                  <AlertTriangle className="h-4 w-4 text-[#F59E0B]" />
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{orderStats.pendingPaymentOrders}</div>
+                <p className="text-sm text-muted-foreground">
+                  {formatCurrency(orderStats.pendingPaymentValue)} pending
+                </p>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

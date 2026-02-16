@@ -6,7 +6,8 @@ import { signInAction, type SignInFormData } from "@/lib/actions/auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Loader2, AlertCircle, Package } from "lucide-react";
+import { Loader2, AlertCircle } from "lucide-react";
+import Image from "next/image";
 import Link from "next/link";
 
 function SignInContent() {
@@ -52,12 +53,15 @@ function SignInContent() {
     <div className="flex min-h-screen items-center justify-center bcfi-gradient-bg bcfi-wave-pattern">
       <div className="w-full max-w-md space-y-8 rounded-2xl bg-white p-8 shadow-[0_4px_6px_-1px_rgba(0,0,0,0.1),0_2px_4px_-2px_rgba(0,0,0,0.1)]">
         <div className="text-center">
-          <div className="mx-auto mb-4 h-12 w-12 rounded-xl bg-[#212861] flex items-center justify-center">
-            <Package className="h-6 w-6 text-white" />
+          <div className="mx-auto mb-4 flex items-center justify-center">
+            <Image
+              src="/images/white.png"
+              alt="Stock Pilot"
+              width={200}
+              height={48}
+              priority
+            />
           </div>
-          <h1 className="text-2xl font-bold text-[#212861]">
-            Import Platform
-          </h1>
           <p className="mt-2 text-sm text-[#6B7280]">
             Sign in to your account
           </p>
@@ -122,10 +126,14 @@ export default function SignInPage() {
       <div className="flex min-h-screen items-center justify-center bcfi-gradient-bg">
         <div className="w-full max-w-md space-y-8 rounded-2xl bg-white p-8 shadow-lg">
           <div className="text-center">
-            <div className="mx-auto mb-4 h-12 w-12 rounded-xl bg-[#212861] flex items-center justify-center">
-              <Package className="h-6 w-6 text-white" />
+            <div className="mx-auto mb-4 flex items-center justify-center">
+              <Image
+                src="/images/white.png"
+                alt="Stock Pilot"
+                width={200}
+                height={48}
+              />
             </div>
-            <h1 className="text-2xl font-bold text-[#212861]">Import Platform</h1>
             <p className="mt-2 text-sm text-[#6B7280]">Sign in to your account</p>
           </div>
         </div>

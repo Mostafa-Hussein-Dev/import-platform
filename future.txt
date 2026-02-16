@@ -1,0 +1,6 @@
+  - Email notifications to customers
+  - Shipping integration (tracking numbers, carrier API)
+  - Invoice PDFs automatically emailed
+  - Partial refunds
+  - Payment gateway integration (Stripe, etc.)]
+  - reports
